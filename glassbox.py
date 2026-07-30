@@ -1,15 +1,27 @@
-"""GlassBox - semantic-entropy hallucination detection for Gemma.
+"""GlassBox - finding the reasoning step where Gemma 4 starts guessing.
 
-Ask the same question N times. If Gemma knows the answer, every sample means
-the same thing (1 cluster -> entropy 0). If it is confabulating, the samples
-scatter (N clusters -> entropy 1). Gemma itself is the equivalence judge.
+Ask the same question seven times. If Gemma knows the answer, every trace means
+the same thing (1 cluster -> entropy 0). If it is confabulating, they scatter
+(N clusters -> entropy 1). Gemma itself is the judge.
 
-This needs open weights: N-sampling and self-judging are only cheap when the
-model runs locally. A closed API bills you 6x and hides the spread.
+Two layers:
+  * `inspect()` compares the seven *reasoning traces* step by step and locates
+    the diverging step. This is the main event.
+  * `score()` is the older answer-level detector, kept because eval.py measures
+    it (92% recall / 100% precision, n=24) and because `inspect` folds the final
+    answer in as a trailing assertion.
+
+Open weights are load-bearing three times over: the judge reads YES/NO logits
+rather than sampled text, sampling is seeded so traces are reproducible, and
+repair resumes generation from a hand-edited reasoning prefix. None of the three
+is reachable through a hosted API. Measured cost is ~7x the generated tokens of
+a single answer - see probe.py for the single-forward-pass alternative.
 
     python glassbox.py test          # self-check, needs no model at all
+    python glassbox.py judgecheck    # measure the judge on labelled pairs
+    python glassbox.py inspect "..." # step-level reasoning analysis, as JSON
+    python glassbox.py ask "..."     # answer-level detection, as JSON
     python glassbox.py serve         # http://127.0.0.1:8000
-    python glassbox.py ask "who invented the safety pin?"
 """
 
 import json

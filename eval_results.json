@@ -15,8 +15,8 @@
       ]
     },
     "shipped_thresholds": {
-      "shaky": 0.3,
-      "confabulated": 0.6
+      "shaky": 0.15,
+      "confabulated": 0.45
     }
   },
   "rows": [

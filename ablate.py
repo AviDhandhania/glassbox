@@ -92,9 +92,30 @@ def report(rows):
     }
     OUT.write_text(json.dumps({"summary": summary, "rows": rows}, indent=2), encoding="utf-8")
     print("\n" + json.dumps(summary, indent=2))
-    if n:
-        print(f"\nSLIDE: thinking mode cuts confabulation on unanswerable questions from "
-              f"{off}/{n} to {on}/{n} ({summary['relative_reduction']:.0%} relative reduction)")
+    if not n:
+        return
+
+    # Report the null honestly. An earlier version printed "cuts confabulation
+    # from 1/12 to 1/12", which reads like a measured effect when it is a floor:
+    # the model already declines these with thinking off, so there is nothing left
+    # to reduce. The one CONFAB is also a scoring error - on the Apollo question it
+    # correctly answered that no mission landed on the far side, which COMMIT_TMPL
+    # says to score NO, and committed() scored YES.
+    if off == on:
+        print(f"\nSLIDE (null result): {off}/{n} confabulations with thinking OFF and {on}/{n} with it ON."
+              f"\n  No difference to measure - Gemma 4 already declines these questions unaided.")
+        print("  This is a FLOOR EFFECT, not evidence that thinking mode does nothing useful.")
+        print("  Do not present it as a reduction. To measure one, the set needs questions the")
+        print("  model actually falls for: a real entity with a specific half-remembered fact")
+        print("  (the ununoctium shape), not an obviously invented premise.")
+    else:
+        print(f"\nSLIDE: thinking mode moved confabulation from {off}/{n} to {on}/{n} "
+              f"({summary['relative_reduction']:.0%} relative)")
+    if summary["still_confabulates_with_thinking"]:
+        print("\n  Check these by hand before quoting anything - a correct refusal scored as a")
+        print("  commitment is the known failure mode of committed():")
+        for q in summary["still_confabulates_with_thinking"]:
+            print(f"    {q}")
 
 
 if __name__ == "__main__":
