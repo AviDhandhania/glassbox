@@ -396,17 +396,18 @@ def serve(port=8000):
 
 TRACE_SPLIT = re.compile(r"<channel\|>")
 STEP_SPLIT = re.compile(r"^\s*\d+\.\s+", re.M)
-# Swept against 14 labelled questions by `python traces.py --report`: 86% accuracy
-# over the range [0.36, 0.57], and 0.46 is its centre. Earlier values (0.45 carried
-# over from the answer-level detector, then 0.30 guessed from two calibration
-# points) both happened to land near the right answer, but neither was derived
-# from labelled step data.
+# Swept against 14 labelled questions by `python traces.py --report`: every value
+# in [0.36, 0.57] scores 86% / 83% / 83%, so accuracy alone does not pick one.
 #
-# Caveat worth knowing: llama.cpp generation is not bit-identical across different
-# CPUs, so the same seed can yield a slightly different trace on another machine
-# and shift a borderline step across this line. Re-run the sweep on the machine
-# you intend to demo from.
-FORK = 0.46
+# 0.40 is chosen inside that plateau for a second reason: a step carrying a known
+# factual error measured 0.406 on one machine, and anything above that misses it
+# while gaining nothing. The plateau's centre (0.46) and the old 0.45 both sit on
+# the wrong side of that. An earlier provisional 0.30 was a real regression - 79%,
+# turning a true negative into a false positive - and rescued no recall at all.
+#
+# llama.cpp generation is not bit-identical across CPUs, so a borderline step can
+# shift sides on another machine. Re-run the sweep where you intend to demo.
+FORK = 0.40
 # Entropy over a handful of aligned traces is a coarse estimate - with 4 traces
 # it can only take a few values, so one sample landing differently swings it
 # past a threshold. More traces is the honest fix; the Arc box has the headroom.
@@ -680,11 +681,29 @@ def repair(question, insp):
     # something to adjudicate, flagged or not.
     # The appended answer row is not a reasoning step - there is nothing after it
     # to re-run, so repair stays on the trace itself.
-    candidates = [s for s in insp["steps"] if s["claim"] and s["variants"] and not s.get("is_answer")]
+    #
+    # Drop procedural readings from the group rather than rejecting the whole step.
+    #
+    # Scoring only the primary text let groups through whose *variants* were
+    # procedure ("Analyze the Request", "Final Answer Construction"). Asking which
+    # of those is "correct" is a malformed question, so the model declines - and
+    # that decline says nothing about whether it can recognise a right answer. That
+    # confound invalidated our first repair measurement.
+    #
+    # Requiring every reading to be a claim over-corrects: one procedural stray in
+    # an otherwise real group ("element 111" vs "element 112" vs "Search for the
+    # value...") would discard a genuine adjudication. Filter the readings instead,
+    # and only keep steps where two or more real claims survive to disagree.
+    candidates = []
+    for s in insp["steps"]:
+        if not s["claim"] or not s["variants"] or s.get("is_answer"):
+            continue
+        keep = [t for t in [s["text"]] + s["variants"] if is_claim(t)]
+        if len(keep) >= 2:
+            candidates.append((s, keep))
     if not candidates:
         return None
-    step = max(candidates, key=lambda s: s["entropy"])
-    readings = [step["text"]] + step["variants"]
+    step, readings = max(candidates, key=lambda c: c[0]["entropy"])
 
     pick = adjudicate(question, readings)
     if pick is None:
@@ -701,23 +720,28 @@ def repair(question, insp):
     prefix = [s["text"] for s in insp["steps"] if s["index"] < step["index"]] + [chosen]
     body = TRACE_HEAD + "".join(f"{i + 1}.  {s}\n" for i, s in enumerate(prefix))
 
-    with _model_lock:
-        llm = _llm()
-        seed_prompt = _prompt_for(
-            llm, [{"role": "system", "content": THINK}, {"role": "user", "content": question}]
-        )
-        key = f"repair|{MODEL_PATH.name}|{body}"
-        with _cache_lock:
-            cached = _cache.get(key)
-        if cached is None:
+    # Consult the cache BEFORE touching the model. _llm() used to be called first,
+    # purely to render the prompt, which meant every repair loaded 2.9GB even on a
+    # pure cache hit - enough to break replay on a weightless clone and with it the
+    # notebook's "no model download" claim.
+    key = f"repair|{MODEL_PATH.name}|{body}"
+    with _cache_lock:
+        cached = _cache.get(key)
+
+    if cached is None:
+        with _model_lock:
+            llm = _llm()
+            seed_prompt = _prompt_for(
+                llm, [{"role": "system", "content": THINK}, {"role": "user", "content": question}]
+            )
             out = llm.create_completion(
                 seed_prompt + body, temperature=0.0, max_tokens=THINK_TOKENS, seed=0
             )
             cached = out["choices"][0]["text"]
-            with _cache_lock:
-                _cache[key] = cached
-                CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
-        _last_toks.pop(id(llm), None)
+            _last_toks.pop(id(llm), None)
+        with _cache_lock:
+            _cache[key] = cached
+            CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
 
     _, answer = parse_trace(body + cached)
     return {
