@@ -20,10 +20,12 @@ alone, and it is what a guardrail needs.
 
 ## Solution
 
-GlassBox makes Gemma 4 reason **seven times**, aligns the traces step by step, and
-measures where they stop agreeing. The output is not *"this answer is
-unreliable"* — it is **"step 2 is where it started guessing, and here is what it
-guessed instead."**
+You ask a question. GlassBox makes Gemma 4 reason **seven times**, parses each
+trace into numbered steps, aligns those steps across traces, and shows you the one
+step where they stopped agreeing. The output is not *"this answer is unreliable"* —
+it is **"step 2 is where it started guessing, and here is what it guessed
+instead."** It then offers the model its own competing readings of that step to
+adjudicate, with "none of these" allowed.
 
 > **What is the atomic radius of ununoctium in picometres?**
 > Gemma 4 answers confidently: *"ununoctium, **element 111**…"* — it is 118.
@@ -34,30 +36,35 @@ guessed instead."**
        also read as: Ununoctium (Uun) is element 112
 3-6. [procedure]
 →  ANSWER  h=0.39, 2 readings across 6 traces
-       another trace answered: …Ununoctium (Uuo), element 118…
 ```
 
-Six steps, one real assertion, and it is the one carrying the error — flagged
-with no reference to the true answer, purely because the model could not tell the
-same story twice.
+Six steps, one real assertion, and it is the one carrying the error — flagged with
+no reference to the true answer, purely because the model could not tell the same
+story twice.
 
 ---
 
-## How Gemma 4 is used
+## How Gemma Is Used
 
 - **Model variant:** Gemma 4 E2B instruction-tuned, Q4_K_M GGUF (2.9 GB).
-- **Role:** one model is **both the reasoner and its own judge.** No second
-  model, no API, no network.
-- **As reasoner:** Gemma 4 emits `<|channel>thought` … `<channel|>` and plans in
-  numbered steps, so traces **parse** instead of needing a heuristic.
-- **As judge:** the judge never speaks. One forward pass comparing the raw logits
-  of the `YES` / `NO` tokens: `P(same) = softmax(logit_YES, logit_NO)`.
-- **As repairer:** generation resumes from a hand-edited reasoning prefix — we
-  rewrite the model's own thought and continue it.
-- **Why E2B:** fits a CPU laptop with room for a 7-trace working set, and at
-  2.9 GB runs fully offline.
-- **Customisation:** no fine-tuning. Prompt design, logit reading, and a linear
-  probe on hidden states.
+- **How it's used:** base model, no fine-tuning, run fully on-device. One model is
+  **both the reasoner and its own judge.** As reasoner it emits
+  `<|channel>thought` … `<channel|>` and plans in numbered steps, so traces
+  **parse** instead of needing a heuristic. As judge it never speaks — we read the
+  raw logits of the `YES` / `NO` tokens: `P(same) = softmax(logit_YES, logit_NO)`.
+  As repairer, generation resumes from a hand-edited reasoning prefix.
+- **Why this variant:** E2B fits a laptop CPU with room for a 7-trace working set,
+  and quantised to 2.9 GB it runs fully offline. Detection costs ~7× the tokens of
+  one answer, so a model small enough to sample seven times *is* the requirement.
+- **Any customization:** no fine-tuning. Prompt design, direct logit reading, and
+  a linear probe trained on the model's hidden states (93 labelled examples).
+
+### Why this needs open weights
+
+1. **Logit access.** Without it the project does not function.
+2. **Per-call seeds**, so seven traces are reproducible and cacheable.
+3. **Trace-prefix continuation.** No chat endpoint lets you rewrite the model's
+   own thought and resume it.
 
 ---
 
@@ -75,47 +82,38 @@ question
   └─► linear probe on hidden state → single-pass screening (cascade)
 ```
 
-**Tech stack:** Python (stdlib `http.server`), one dependency —
-`llama-cpp-python` (prebuilt CPU wheel) — one GGUF, vanilla HTML/CSS/JS UI.
-Target: an ordinary laptop CPU, offline.
+**Tech stack:** Python, stdlib `http.server` backend, vanilla HTML/CSS/JS
+frontend. Inference runtime: `llama-cpp-python` (prebuilt CPU wheel) — the only
+dependency. Deployment target: an ordinary laptop CPU, offline. No API, no second
+model, no network once the GGUF is on disk.
+
+### Three engineering decisions that made it work
+
+**1. Read the logits, not the words.** The single biggest correctness fix. Asked out
+loud, a small Gemma has such a heavy `YES` prior that it called *"Leonardo painted
+it"* and *"Michelangelo painted it"* the same claim — every question collapsed to one
+cluster and every entropy read zero. Six prompt strategies against 12 labelled pairs
+scored **5/12 to 10/12**; asking "do these *conflict*?" also returned YES to
+everything. The model was not comparing, it was agreeing. Reading the logits gave a
+calibratable probability: **12/12** — and costs *less*, one prefill, zero tokens.
+
+**2. Score assertions, not procedure.** Our first version pointed at the wrong
+step. Procedure steps get reworded freely between samples and scored entropy
+**1.0**, while the step carrying the real error scored **0.59** — ranking on raw
+entropy was actively misleading. Filtering to assertions took the ununoctium trace
+from six noisy steps to exactly one, the right one.
+
+**3. Alignment and agreement are different questions.** Aligning by position made
+*"Who painted the Mona Lisa?"* a false positive — trace A's step 2 was "Identify the
+Subject" where trace B's was "Recall knowledge…", and index matching pits unlike
+steps together. Fixing it exposed a subtler bug: we had reused the *agreement* prompt
+for the *alignment* search, but "element 111" vs "element 118" correctly scores NO,
+so the **right** counterpart looked no better than an unrelated one. Alignment needs
+its own prompt, about *role*.
 
 ---
 
-## Three engineering decisions that made it work
-
-### 1. Read the logits, not the words
-
-The single biggest correctness fix. Asked out loud, a small Gemma has such a heavy
-`YES` prior that it called *"Leonardo painted it"* and *"Michelangelo painted it"*
-the same claim — every question collapsed to one cluster and every entropy read
-zero. Six prompt strategies against 12 labelled pairs scored **5/12 to 10/12**;
-asking "do these *conflict*?" also returned YES to everything. The model was not
-comparing, it was agreeing.
-
-Reading the logits gave a graded, calibratable probability: **12/12** — and costs
-*less*, one prefill and zero tokens generated.
-
-### 2. Score assertions, not procedure
-
-Our first version pointed at the wrong step. Procedure steps get reworded freely
-between samples and scored entropy **1.0**, while the step carrying the real error
-scored **0.59** — ranking on raw entropy was actively misleading. Filtering to
-assertions took the ununoctium trace from six noisy steps to exactly one, the
-right one.
-
-### 3. Alignment and agreement are different questions
-
-Aligning by position made *"Who painted the Mona Lisa?"* a false positive: trace
-A's step 2 was "Identify the Subject" where trace B's was "Recall knowledge…", so
-index matching pits unlike steps together and invents disagreement. Fixing it
-exposed a subtler bug — we had reused the *agreement* prompt for the *alignment*
-search, but "is element 111" vs "is element 118" correctly scores NO as a
-claim-match, so the **right** counterpart looked no better than an unrelated one.
-Alignment needs its own prompt, asking about *role* and ignoring agreement.
-
----
-
-## Results
+## Results / Demo
 
 | | |
 |---|---|
@@ -128,33 +126,35 @@ Alignment needs its own prompt, asking about *role* and ignoring agreement.
 | Thinking-mode ablation | null result |
 
 Every threshold comes from a sweep over labelled data and is **centred in its
-winning range**, never parked on the edge. The fork threshold is 0.46, the centre
-of the optimal [0.36, 0.57] range. Our first tuner picked a cut-off 0.009 above
-the highest grounded score; entropy from a handful of samples moves between runs,
-and that would have flipped on noise. We caught it because the tuner is code, not
-a judgement call.
+winning range**, never on the edge. The fork threshold is 0.46, the centre of the
+optimal [0.36, 0.57] range. Our first tuner picked a cut-off 0.009 above the highest
+grounded score — entropy from a handful of samples moves between runs, so that would
+have flipped on noise. We caught it because the tuner is code, not a judgement call.
 
-**Cost, measured on one question:** one answer with thinking generates ~640
-tokens; GlassBox's 7 traces generate **4,487** — ~7×. That is the honest price,
-since disagreement between samples *is* the measurement. Two things offset it:
-136 judge calls generate **zero** tokens, and KV-prefix reuse cut them 55s → 18.5s.
+**Cost, measured on one question:** one answer with thinking generates ~640 tokens;
+GlassBox's 7 traces generate **4,487** — ~7×. That is the honest price: disagreement
+between samples *is* the measurement. Two things offset it — 136 judge calls generate
+**zero** tokens, and KV-prefix reuse cut them 55s → 18.5s.
 
----
+- **Live demo:** `demo.ipynb` — replays the full pipeline from the committed cache
+  in seconds, with **no model download**. Also `python glassbox.py serve` for the
+  local web UI on `127.0.0.1:8000`.
+- **Demo video:** *(add link)*
+- **Screenshots:** *(attach the ununoctium fork view)*
 
-## Three honest findings
+### Three honest findings
 
 **Thinking mode showed no effect.** We assumed it drove Gemma 4's refusals and ran
-the ablation to quantify it. Thinking off: declines all 12. Thinking on: declines
-all 12. **0% confabulation in both conditions** — a floor effect, not an effect.
-The tempting comparison (Gemma 3-without-thinking vs Gemma 4-with-thinking) moves
-two variables and credits the feature for the model's improvement. This reshaped
-the project: the easy bait is gone, and what survives is subtler — **partial
-knowledge about real entities**, where the model half-remembers and fills the gap.
-Exactly what a refusal-based guardrail misses.
+the ablation. Thinking off: declines all 12. Thinking on: declines all 12. **0%
+confabulation in both conditions** — a floor effect, not an effect. The tempting
+comparison (Gemma 3-without-thinking vs Gemma 4-with-thinking) moves two variables
+and credits the feature for the model's improvement. This reshaped the project: the
+easy bait is gone, and what survives is subtler — **partial knowledge about real
+entities**, exactly what a refusal-based guardrail misses.
 
-**Self-repair recognises but does not correct.** Across 8 questions only 2
-produced a divergent step whose readings were factual claims, and one was a clean
-test: offered "element 111" vs "element 112", it declined both — correctly, since
+**Self-repair recognises but does not correct.** Across 8 questions only 2 produced
+a divergent step whose readings were factual claims, and one was a clean test:
+offered "element 111" vs "element 112", it declined both — correctly, since
 ununoctium is 118 and 118 was never in its own candidate set. **n=1 is not a
 result.** The flaw is structural: adjudication can only choose among readings the
 sampling happened to produce. The safety property did hold — an earlier version
@@ -171,42 +171,29 @@ every request in one pass at ~200× less cost, spend the seven traces only on wh
 the probe flags. We read the final-layer embedding rather than the intermediate
 layers the paper probes, and n=93 is small, so treat it as feasibility.
 
----
-
-## What we do not claim
+### What we do not claim
 
 **Consistent false belief is out of scope.** If all seven traces make the *same*
 wrong move, entropy is zero and we call it stable. GlassBox measures whether a
 model is **inventing on the spot**, not whether it is **right**.
 
-In the same spirit: our eval flagged *"boiling point of water in Celsius"* at
-0.311 where we had labelled it answerable. Gemma had replied *"212 degrees
-Celsius"* — the Fahrenheit figure. The detector was right and our label was wrong.
-We left the label alone; relabelling after seeing the score manufactures a number.
-
----
-
-## Why this needs open weights
-
-Three hard requirements, none available through an API:
-
-1. **Logit access.** Without it the project does not function.
-2. **Per-call seeds**, so seven traces are reproducible and cacheable.
-3. **Trace-prefix continuation.** No chat endpoint lets you rewrite the model's
-   own thought and resume it.
-
-It runs offline on a CPU laptop: no server, no API key, no network once the GGUF
-is on disk.
+In the same spirit: our eval flagged *"boiling point of water in Celsius"* at 0.311
+where we had labelled it answerable. Gemma had replied *"212 degrees Celsius"* — the
+Fahrenheit figure. The detector was right and our label was wrong. We left the
+label alone; relabelling after seeing the score manufactures a number.
 
 ---
 
 ## Links
 
 - **GitHub repo:** https://github.com/AviDhandhania/glassbox
-- **Live demo:** `demo.ipynb` — replays the full pipeline from the committed
-  cache in seconds, no model download required. Also `python glassbox.py serve`
-  for the local web UI.
-- **License:** Apache 2.0
+- **Dataset(s) used:** none external — every test set is hand-labelled in-repo
+  (`eval.py` n=24 answer-level, `traces.py` n=14 step-level, `bulk_label.py` n=93
+  probe training, 12 judge equivalence pairs)
+- **Demo:** `demo.ipynb` in the repo — runs from cache, no weights needed
+- **License for this project:** Apache 2.0
+
+---
 
 ## Acknowledgments
 

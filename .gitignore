@@ -8,4 +8,7 @@ models/
 
 __pycache__/
 *.pyc
+
+# Screenshots stay local, but the Kaggle card art is a submission asset.
 *.png
+!thumbnail.png
