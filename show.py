@@ -18,7 +18,8 @@ for s in r["steps"]:
         continue
     flag = "<<< FORK" if s["index"] == r["fork"] else ""
     gap = f" (+{s['absent']} traces skipped this)" if s.get("absent") else ""
-    print(f"  {s['index']}. h={s['entropy']:<5} {s['n_clusters']} of {s['n_aligned']} readings{gap}  {s['text'][:58]} {flag}")
+    tag = "ANSWER" if s.get("is_answer") else f"{s['index']}."
+    print(f"  {tag} h={s['entropy']:<5} {s['n_clusters']} of {s['n_aligned']} readings{gap}  {s['text'][:58]} {flag}")
     for v in s["variants"]:
         print(f"        also: {v[:88]}")
 print(f"\nfork at step {r['fork']}   |   {r['n_claims']} claim steps of {r['depth']}   |   "

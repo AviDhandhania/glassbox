@@ -551,17 +551,54 @@ def step_entropy(question, primary, others, max_steps=MAX_STEPS):
     return out
 
 
+def answer_spread(question, primary, answers):
+    """Semantic entropy over the final answers themselves.
+
+    The backstop for a real gap: some questions produce a trace that is pure
+    procedure - the model plans, hedges, and only commits in the answer. Those
+    score zero assertions, so step analysis has nothing to look at and the error
+    walks straight through. Clustering the answers catches exactly that case.
+    """
+    pool = [a for a in [primary] + answers if a]
+    if len(pool) < 2:
+        return None
+    clusters = []
+    for j, a in enumerate(pool):
+        for c in clusters:
+            if p_yes(JUDGE_TMPL.format(q=question, a=pool[c[0]], b=a)) >= JUDGE_THRESHOLD:
+                c.append(j)
+                break
+        else:
+            clusters.append([j])
+    return {
+        "entropy": round(entropy(clusters, len(pool)), 3),
+        "n_clusters": len(clusters),
+        "n_aligned": len(pool),
+        "variants": [pool[c[0]] for c in clusters[1:]],
+    }
+
+
 def inspect(question, n=TRACE_SAMPLES):
     """Sample N reasoning traces, score every assertion, and locate the fork."""
     primary_steps, primary_answer = parse_trace(think(question, seed=0, temperature=0.0))
-    others = [parse_trace(think(question, i + 1, TEMP))[0] for i in range(n)]
-    others = [t for t in others if t]
+    parsed = [parse_trace(think(question, i + 1, TEMP)) for i in range(n)]
+    others = [t for t, _ in parsed if t]
+    other_answers = [a for _, a in parsed]
     if not primary_steps:
         primary_steps = others.pop(0) if others else []
     if not primary_steps:
         return {"question": question, "error": "no parseable reasoning trace"}
 
     steps = step_entropy(question, primary_steps, others)
+    spread = answer_spread(question, primary_answer, other_answers)
+    if spread:
+        # The answer is the last assertion, and on procedure-only traces it is the
+        # ONLY one. Appending it as a final step means those questions still get
+        # scored instead of silently passing.
+        steps.append({
+            "index": len(steps) + 1, "text": primary_answer or "(no answer parsed)",
+            "claim": True, "is_answer": True, "absent": 0, **spread,
+        })
     claims = [s for s in steps if s["claim"]]
     fork = next((s["index"] for s in claims if s["entropy"] >= FORK), None)
     traces = [primary_steps] + others
@@ -570,6 +607,7 @@ def inspect(question, n=TRACE_SAMPLES):
         "answer": primary_answer,
         "steps": steps,
         "fork": fork,
+        "answer_entropy": spread["entropy"] if spread else None,
         "n_traces": len(traces),
         "depth": len(steps),
         "n_claims": len(claims),
@@ -621,7 +659,9 @@ def repair(question, insp):
     # still provisional, and gating repair on it means a mis-set threshold
     # silently disables repair entirely. Wherever the traces disagree there is
     # something to adjudicate, flagged or not.
-    candidates = [s for s in insp["steps"] if s["claim"] and s["variants"]]
+    # The appended answer row is not a reasoning step - there is nothing after it
+    # to re-run, so repair stays on the trace itself.
+    candidates = [s for s in insp["steps"] if s["claim"] and s["variants"] and not s.get("is_answer")]
     if not candidates:
         return None
     step = max(candidates, key=lambda s: s["entropy"])

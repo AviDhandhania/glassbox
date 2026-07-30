@@ -52,7 +52,12 @@ That is the failure this tool exists to surface.
    normalised Shannon entropy over the clusters. 0 = all five made the same move,
    1 = five different moves.
 4. **The fork** is the first assertion step above threshold.
-5. **Repair.** Show the model the competing readings of the most divergent step,
+5. **Score the final answer too.** Some traces are pure procedure — the model
+   plans, hedges, and only commits in the answer. Those have zero assertions, so
+   step analysis alone finds nothing and the error walks straight through. Two of
+   fourteen test questions behaved exactly this way, so the answer is clustered
+   across traces and appended as a final row.
+6. **Repair.** Show the model the competing readings of the most divergent step,
    let it adjudicate, rebuild the trace prefix with its choice, and continue
    generating from there. Repair deliberately targets the most divergent step
    rather than the flagged fork — the fork threshold is still untuned, and gating

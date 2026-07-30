@@ -248,12 +248,17 @@
           return `<div class="step proc"><div class="n">${s.index}</div><div class="body">
             <p>${esc(s.text)}</p><div class="meta">procedure — not scored</div></div></div>`;
         const alts = s.variants
-          .map((v) => `<p class="alt">also read as: ${esc(v)}</p>`)
+          .map((v) => `<p class="alt">${s.is_answer ? "other traces answered" : "also read as"}: ${esc(v)}</p>`)
           .join("");
-        return `<div class="step${isFork ? " fork" : ""}"><div class="n">${s.index}</div><div class="body">
+        const label = s.is_answer
+          ? '<span style="color:var(--text-secondary);font-weight:700">FINAL ANSWER · </span>'
+          : isFork
+            ? '<span class="tag">FORK · </span>'
+            : "";
+        return `<div class="step${isFork ? " fork" : ""}"><div class="n">${s.is_answer ? "→" : s.index}</div><div class="body">
           <p>${esc(s.text)}</p>
           <div class="bar"><i style="width:${Math.round(s.entropy * 100)}%"></i></div>
-          <div class="meta">${isFork ? '<span class="tag">FORK · </span>' : ""}entropy ${s.entropy.toFixed(2)} — ${s.n_clusters} reading${s.n_clusters > 1 ? "s" : ""} across ${r.n_traces} traces</div>
+          <div class="meta">${label}entropy ${s.entropy.toFixed(2)} — ${s.n_clusters} reading${s.n_clusters > 1 ? "s" : ""} across ${s.n_aligned} traces</div>
           ${alts}</div></div>`;
       })
       .join("");
