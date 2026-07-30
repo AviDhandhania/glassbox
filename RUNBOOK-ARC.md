@@ -38,27 +38,33 @@ the judge being calibrated.
 python -u traces.py
 ```
 
-Resumable — safe to Ctrl-C and re-run. 14 questions × 5 traces.
+Resumable — safe to Ctrl-C and re-run. 14 questions × 7 traces.
 
-**There is a known bug waiting in here.** The first result on the other machine
-was a false positive: *"Who painted the Mona Lisa?"* reported `FORK@2` when it
-should be stable, with 4 of 6 steps classified as claims. When the run finishes:
+**Delete `trace_results.json` before this run.** Rows saved by the other machine
+used the old positional alignment and a looser claim filter, so they are not
+comparable with anything produced now.
 
 ```bash
-python show.py "Who painted the Mona Lisa?"
+rm trace_results.json && python -u traces.py
 ```
 
-Paste that output back. The question is whether the claim classifier is calling
-procedure steps "claims", or whether the step judge is splitting on pure
-rephrasing. That diagnosis decides the fix, so don't guess at it — send the steps.
+The Mona Lisa false positive is **fixed** — don't go hunting it. It was a
+too-permissive claim classifier plus index-based step alignment; both are
+rewritten. Mona Lisa is now stable at 1 claim step, h=0.0.
 
-Then re-tune the threshold from the saved data, no regeneration needed:
+**This job's real purpose is the threshold.** `FORK = 0.45` is inherited from the
+answer-level detector and has never been swept against step data. Entropy over a
+few traces is coarse: ununoctium measured 0.59 with 5 traces and 0.406 with 4,
+which straddles the cut-off. Sample count is now 6 to damp that.
+
+When the run finishes:
 
 ```bash
 python traces.py --report
 ```
 
-It prints `set FORK = <x>`. Report the number.
+It prints `set FORK = <x>` from a proper sweep. **Report that number** — it is
+the one value gating whether the fork calls in the demo are trustworthy.
 
 ## Job 3 — the thinking on/off study
 

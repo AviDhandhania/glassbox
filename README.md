@@ -123,15 +123,28 @@ Working and measured:
 - answer-level detector — 92% / 100% precision
 - web UI, terminal viewer, committed warm cache
 
+Fixed since first run — the Mona Lisa false positive turned out to be two bugs:
+
+- **Claim classifier was too permissive.** It scored *"Identify the Subject: The
+  Mona Lisa"* and *"Final Answer Construction"* as factual claims because they
+  mention a name. Now few-shot with an explicit "could this be WRONG?" framing and
+  a 0.90 confidence floor. Mona Lisa went from 4 claim steps to 1 — the real one.
+- **Positional alignment was comparing unlike steps.** Trace A's step 2 is
+  "Identify the Subject" where trace B's is "Recall knowledge about…", so index
+  matching manufactured disagreement. Alignment is now by *role*, using a separate
+  prompt from the one that scores agreement — reusing one prompt for both broke
+  it, since "is element 111" vs "is element 118" correctly scores NO as a
+  claim-match and so the right counterpart looked no better than an unrelated step.
+
 Open:
 
-- **`traces.py` is mid-run.** First result is a false positive: *"Who painted the
-  Mona Lisa?"* reported FORK@2 when it should be stable, with 4/6 steps classified
-  as claims. Suspect the claim classifier is too permissive on easy questions, or
-  the step judge is too strict about phrasing. Needs the full run, then inspect
-  the Mona Lisa steps directly.
-- Fork threshold (0.45) is inherited from answer-level entropy and has not been
-  swept on step data yet. `traces.py --report` re-tunes without re-running the model.
+- **The fork threshold is untuned.** 0.45 is inherited from the answer-level
+  detector. With few traces the entropy estimate is coarse and one sample can
+  swing it across the line — ununoctium read 0.59 with 5 traces and 0.406 with 4.
+  Sample count is now 6, and `python traces.py --report` sweeps the threshold
+  against labelled data without regenerating anything. **Until that runs, treat
+  every fork/no-fork call as provisional.**
+- `traces.py` and `ablate.py` both need a full run — see [RUNBOOK-ARC.md](RUNBOOK-ARC.md).
 
 ## Running it
 
