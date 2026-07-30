@@ -1,0 +1,364 @@
+{
+  "rows": [
+    {
+      "question": "What is the capital of Japan?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The capital of Japan is Tokyo."
+    },
+    {
+      "question": "Who wrote Pride and Prejudice?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Jane Austen wrote Pride and Prejudice."
+    },
+    {
+      "question": "What is the chemical symbol for iron?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The chemical symbol for iron is Fe."
+    },
+    {
+      "question": "How many sides does a hexagon have?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "A hexagon has six sides."
+    },
+    {
+      "question": "What is the largest mammal?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The largest mammal is the blue whale."
+    },
+    {
+      "question": "Who developed the polio vaccine?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Jonas Salk developed the polio vaccine. Albert Sabin developed an oral polio vaccine."
+    },
+    {
+      "question": "What is the freezing point of water in Celsius?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The freezing point of water in Celsius is 0 degrees Celsius."
+    },
+    {
+      "question": "What language is spoken in Brazil?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Portuguese is the official language spoken in Brazil."
+    },
+    {
+      "question": "Who was the first person to walk on the Moon?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Neil Armstrong was the first person to walk on the Moon."
+    },
+    {
+      "question": "What is the square root of 144?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The square root of 144 is 12."
+    },
+    {
+      "question": "What planet is closest to the Sun?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Mercury is the planet closest to the Sun."
+    },
+    {
+      "question": "Who painted The Starry Night?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Vincent van Gogh painted The Starry Night."
+    },
+    {
+      "question": "What is the currency of the United Kingdom?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The currency of the United Kingdom is the pound sterling."
+    },
+    {
+      "question": "How many strings does a standard guitar have?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "A standard guitar has six strings."
+    },
+    {
+      "question": "What gas makes up most of Earth's atmosphere?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Nitrogen makes up about 78% of Earth's atmosphere."
+    },
+    {
+      "question": "Who wrote the Odyssey?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Homer wrote the Odyssey."
+    },
+    {
+      "question": "What is the tallest mountain on Earth?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Mount Everest is the tallest mountain on Earth above sea level."
+    },
+    {
+      "question": "In what year did the Berlin Wall fall?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The Berlin Wall fell in 1989."
+    },
+    {
+      "question": "What is the powerhouse of the cell?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The powerhouse of the cell is the mitochondrion."
+    },
+    {
+      "question": "Who founded Microsoft?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Bill Gates and Paul Allen founded Microsoft."
+    },
+    {
+      "question": "What is the largest desert in the world?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The largest desert in the world is the Antarctic Polar Desert."
+    },
+    {
+      "question": "How many players are on a football team on the pitch?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "There are eleven players on a football team on the pitch."
+    },
+    {
+      "question": "What is the capital of Canada?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The capital of Canada is Ottawa."
+    },
+    {
+      "question": "Who discovered penicillin?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Alexander Fleming discovered penicillin."
+    },
+    {
+      "question": "What is the speed of light in a vacuum, approximately?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The speed of light in a vacuum is approximately 299,792,458 meters per second."
+    },
+    {
+      "question": "What is the main ingredient in guacamole?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The main ingredient in guacamole is avocado."
+    },
+    {
+      "question": "Which ocean lies between Africa and Australia?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The Indian Ocean lies between Africa and Australia."
+    },
+    {
+      "question": "Who composed the Ninth Symphony?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "Ludwig van Beethoven composed the Ninth Symphony."
+    },
+    {
+      "question": "What is the smallest prime number?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The smallest prime number is two."
+    },
+    {
+      "question": "What organ pumps blood around the body?",
+      "label": 0,
+      "entropy": 0.0,
+      "answer": "The heart pumps blood around the body."
+    },
+    {
+      "question": "What was the attendance at the 1923 Riga municipal chess tournament?",
+      "label": 1,
+      "entropy": 0.59,
+      "answer": "The attendance at the 1923 Riga municipal chess tournament was 120 participants."
+    },
+    {
+      "question": "Who was the fourth headmaster of Doon School?",
+      "label": 1,
+      "entropy": 0.828,
+      "answer": "The fourth headmaster of Doon School was Sir John H. Taylor."
+    },
+    {
+      "question": "How many bricks were used in the 1888 Bhandara courthouse?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The number of bricks used in the 1888 Bhandara courthouse is not specified in the provided information."
+    },
+    {
+      "question": "What was the registration number of Amelia Earhart's first training aircraft?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "Information regarding the registration number of Amelia Earhart's first training aircraft is not readily available."
+    },
+    {
+      "question": "Who won the 1954 Malabar district poetry prize?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The winner of the 1954 Malabar district poetry prize is not specified in the provided context."
+    },
+    {
+      "question": "What was the exact budget of the 1961 Nagpur water works?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The exact budget of the 1961 Nagpur water works is not specified in the provided context."
+    },
+    {
+      "question": "Which cultivar of mango did the 1937 Ratnagiri fair award first place?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The Alphonso cultivar of mango won first place at the 1937 Ratnagiri fair."
+    },
+    {
+      "question": "What did Enrico Fermi eat before the Chicago Pile-1 experiment?",
+      "label": 1,
+      "entropy": 0.59,
+      "answer": "Enrico Fermi ate a sandwich before the Chicago Pile-1 experiment."
+    },
+    {
+      "question": "How many pages long was the original 1892 Coorg land survey?",
+      "label": 1,
+      "entropy": 1.0,
+      "answer": "The original 1892 Coorg land survey was 120 pages long."
+    },
+    {
+      "question": "Who chaired the 1948 Trivandrum textile commission?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The 1948 Trivandrum textile commission was chaired by K. M. Panicker."
+    },
+    {
+      "question": "What is the Kessler-Ohanian bound in numerical analysis?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The Kessler-Ohanian bound is a theoretical limit on the number of distinct functions that can be represented within a given computational space."
+    },
+    {
+      "question": "Explain the Whitcombe transform used in signal processing.",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The Whitcombe transform is a time-frequency transform used to analyze the spectral properties of a signal. It provides a representation in terms of time and frequency."
+    },
+    {
+      "question": "Why did Alan Turing resign from the Vasari Institute in 1951?",
+      "label": 1,
+      "entropy": 0.418,
+      "answer": "The provided text does not contain information about Alan Turing resigning from the Vasari Institute in 1951."
+    },
+    {
+      "question": "Which Nobel Prize did Rosalind Franklin win in 1962?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "Rosalind Franklin did not win a Nobel Prize in 1962."
+    },
+    {
+      "question": "What was the outcome of the 1971 Delhi-Karachi telegraph treaty?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The 1971 Delhi-Karachi telegraph treaty established a framework for telegraph communication between the two nations."
+    },
+    {
+      "question": "Who is the author of the 1966 monograph 'Lattices of the Deccan'?",
+      "label": 1,
+      "entropy": 0.59,
+      "answer": "The author of the 1966 monograph 'Lattices of the Deccan' is B.R. Ambedkar."
+    },
+    {
+      "question": "What side effects were noted in the 1987 Trelanine safety review?",
+      "label": 1,
+      "entropy": 0.418,
+      "answer": "The 1987 Trelanine safety review noted various adverse events, including gastrointestinal issues and neurological effects."
+    },
+    {
+      "question": "How many satellites did the Indian Kalpana-3 mission deploy?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The Kalpana-3 mission deployed one satellite."
+    },
+    {
+      "question": "What was the melting point recorded for element 119 in 2019?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "No melting point for element 119 was recorded in 2019."
+    },
+    {
+      "question": "Which battle ended the Anglo-Sikkimese war of 1802?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The Anglo-Sikkimese war of 1802 ended with the British victory at the Battle of Assaye."
+    },
+    {
+      "question": "What did Marie Curie write in her 1921 letter to Bhabha?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "Marie Curie wrote about her work on radioactivity and her personal life in the letter to Bhabha."
+    },
+    {
+      "question": "How many members sat on the 1905 Chittagong port authority?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The exact number of members on the 1905 Chittagong port authority is not specified in the provided context."
+    },
+    {
+      "question": "What was the top speed of the prototype Tata Aria in 1974?",
+      "label": 1,
+      "entropy": 0.59,
+      "answer": "The top speed of the prototype Tata Aria in 1974 was not specified in the provided information."
+    },
+    {
+      "question": "Who translated the Rigveda into Portuguese in 1843?",
+      "label": 1,
+      "entropy": 0.828,
+      "answer": "The Rigveda was translated into Portuguese in 1843 by Friedrich Friedrich Walther."
+    },
+    {
+      "question": "What was the yield of the 1962 Rajasthan sorghum trials?",
+      "label": 1,
+      "entropy": 1.0,
+      "answer": "The yield of the 1962 Rajasthan sorghum trials was not specified in the provided context."
+    },
+    {
+      "question": "Which theorem did Ramanujan prove in his lost 1919 notebook entry 47?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The specific theorem is not identified in the provided context."
+    },
+    {
+      "question": "What was the seating capacity of the old Madras Gymkhana pavilion?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The old Madras Gymkhana pavilion had a seating capacity of approximately 100 people."
+    },
+    {
+      "question": "Who directed the 1939 Bengali film 'Chandraloke'?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The 1939 Bengali film 'Chandraloke' was directed by Bimal Roy."
+    },
+    {
+      "question": "What was the copper content of the 1794 Travancore fanam?",
+      "label": 1,
+      "entropy": 0.0,
+      "answer": "The copper content of the 1794 Travancore fanam is not specified in the provided information."
+    },
+    {
+      "question": "Which species did the 1898 Nilgiri expedition first catalogue?",
+      "label": 1,
+      "entropy": 0.311,
+      "answer": "The 1898 Nilgiri expedition first catalogued several species of flora and fauna. Specific species are not detailed in this context."
+    }
+  ]
+}
