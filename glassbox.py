@@ -396,17 +396,17 @@ def serve(port=8000):
 
 TRACE_SPLIT = re.compile(r"<channel\|>")
 STEP_SPLIT = re.compile(r"^\s*\d+\.\s+", re.M)
-# PROVISIONAL - `python traces.py --report` sweeps this properly against labelled
-# step data and prints the value to paste here.
+# Swept against 14 labelled questions by `python traces.py --report`: 86% accuracy
+# over the range [0.36, 0.57], and 0.46 is its centre. Earlier values (0.45 carried
+# over from the answer-level detector, then 0.30 guessed from two calibration
+# points) both happened to land near the right answer, but neither was derived
+# from labelled step data.
 #
-# 0.45 was carried over from the answer-level detector, which measures a different
-# thing (whole answers over 5 samples, not aligned steps over 7). On step data it
-# sat above the real signal: a question with a known factual error scored 0.406 and
-# was called stable. 0.30 is set from the only two calibration points available -
-# claim steps on a question the model knows land at exactly 0.0, and the erroneous
-# step lands at 0.41 - and it stays above the 0.216 that a single dissenting trace
-# out of seven produces, so one odd sample is not enough to trip it.
-FORK = 0.30
+# Caveat worth knowing: llama.cpp generation is not bit-identical across different
+# CPUs, so the same seed can yield a slightly different trace on another machine
+# and shift a borderline step across this line. Re-run the sweep on the machine
+# you intend to demo from.
+FORK = 0.46
 # Entropy over a handful of aligned traces is a coarse estimate - with 4 traces
 # it can only take a few values, so one sample landing differently swings it
 # past a threshold. More traces is the honest fix; the Arc box has the headroom.

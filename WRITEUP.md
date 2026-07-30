@@ -113,7 +113,14 @@ refusal-based guardrail misses.
 |---|---|
 | Judge accuracy | **12/12** labelled equivalence pairs |
 | Answer-level detection | **92%** of confabulations at **100%** precision (n=24) |
+| Step-level localization | **86%** accuracy, 83% precision, 83% recall (n=14) |
 | Mean entropy, answerable / obscure | 0.026 / 0.674 |
+
+The fork threshold is 0.46, the centre of the [0.36, 0.57] range that a sweep over
+labelled step data showed to be optimal. Two earlier values — 0.45 inherited from
+the answer-level detector, then 0.30 guessed from two calibration points — both
+landed near the right answer by luck, and neither was derived from data. We only
+found that out by sweeping.
 
 Every threshold comes from a sweep over labelled data and is **centred in its
 winning range**, never parked on the edge. Our first tuner picked a cut-off 0.009
@@ -121,14 +128,46 @@ above the highest grounded score; entropy from a handful of samples moves betwee
 runs, and that would have flipped on noise. We caught it because the tuner is
 code, not a judgement call.
 
-## What we do not claim
+## Finding 2: recognition rejects, but does not correct
 
-**Self-repair is implemented but not yet validated.** The mechanism is built and
-the interface is done, but it has not been run against a real fork at the time of
-writing — our development machine is CPU-only and could not reach one in
-reasonable time. If it works, the model repairs its own hallucination with no
-external source. If recognition turns out not to beat recall at 2B, that is a
-finding too, and it will be reported as one.
+We said we would report the repair result either way. Here it is.
+
+Across 8 questions, 5 produced a divergent step to adjudicate:
+
+| | |
+|---|---|
+| Rejected every reading ("none of these") | **4** |
+| Kept its original reading | **1** |
+| Changed its mind | **0** |
+| Corrected an answer | **0** |
+| **Made an answer worse** | **0** |
+
+**Recognition was enough to reject, not enough to correct.** Shown its own
+competing versions of a step, Gemma 4 E2B reliably identifies that none of them is
+right — but it cannot produce the right one, because the right one was never in
+the candidate set. It knows that it does not know.
+
+That is a negative result for repair-as-correction and a positive one for
+repair-as-guardrail: **zero false repairs in five opportunities.**
+
+Getting there required a fix. Our first version *forced* a choice among the
+readings. On ununoctium — truly element 118 — it was offered "element 111" and
+"element 112", picked 112, and confidently re-derived a complete answer around it.
+It swapped one wrong claim for another and made the output *look* corrected, which
+is strictly worse than leaving it alone. Adding an explicit "none of these is
+correct" option is what turned a plausible-looking failure into a guardrail that
+fails closed.
+
+This also sits in a specific research context.
+[Huang et al. (ICLR 2024)](https://arxiv.org/abs/2310.01798) showed that
+**intrinsic** self-correction fails — ask a model to reflect on its own answer and
+performance often degrades. We never ask it to reflect. We hand it a shortlist it
+generated itself and ask a recognition question. Our result is consistent with
+theirs on the correction half, and adds something on the detection half: the
+recognition signal is real and usable, it just does not reach far enough to fix
+the answer at this model size.
+
+## What we do not claim
 
 **Consistent false belief is out of scope.** If all seven traces make the *same*
 wrong move, entropy is zero and we call it stable. GlassBox measures whether a
@@ -150,7 +189,11 @@ Three hard requirements, none available through an API:
 1. **Logit access.** The judge reads token probabilities directly. Without it the
    project does not function — the sampled token is dominated by a YES prior.
 2. **Per-call seeds.** Seven independent-but-reproducible traces, so results are
-   cacheable and every number here is deterministic.
+   cacheable and every number here is reproducible *on a given machine*. Merging
+   caches from two machines showed 5 of 1630 entries disagreeing — llama.cpp
+   generation is not bit-identical across different CPUs, so a borderline step can
+   land either side of a threshold. Worth stating rather than claiming determinism
+   we do not have.
 3. **Trace-prefix continuation.** Repair restarts generation from a hand-edited
    reasoning prefix. No chat endpoint lets you rewrite the model's own thought and
    resume from it.

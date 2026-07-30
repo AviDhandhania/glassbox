@@ -89,8 +89,17 @@ def sweep(rows):
 
 
 def report(rows):
+    # Recompute from the saved per-step entropies at the CURRENTLY configured
+    # threshold. The stored `fork` field records whatever FORK happened to be when
+    # the row was generated, so reporting from it silently describes a different
+    # setting than the one in the config - which is how you end up publishing a
+    # confusion matrix that does not match your own threshold.
     if rows and "steps" in rows[0]:
         sweep(rows)
+        for r in rows:
+            r["fork"] = next((s["index"] for s in r["steps"]
+                              if s["claim"] and s["entropy"] is not None and s["entropy"] >= FORK), None)
+
     tp = sum(1 for r in rows if r["fork"] and r["label"] == 1)
     fp = sum(1 for r in rows if r["fork"] and r["label"] == 0)
     fn = sum(1 for r in rows if not r["fork"] and r["label"] == 1)

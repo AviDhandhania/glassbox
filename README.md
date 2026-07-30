@@ -106,7 +106,14 @@ non-matching at p≤0.83, threshold 0.91 centred in its winning range.
 | Precision | 100% |
 | Mean entropy, answerable / obscure | 0.026 / 0.674 |
 
-**Step-level localization** (`traces.py`) — in progress, see Status.
+**Step-level localization** (`traces.py`, n=14): **86% accuracy**, 83% precision,
+83% recall. Fork threshold 0.46, the centre of the [0.36, 0.57] winning range from
+a sweep over labelled step data.
+
+**Self-repair** (`repair_check.py`, n=8): 5 questions produced a divergent step.
+The model **rejected every reading on 4 of them**, kept its original on 1, and
+changed its mind on none. **0 corrected, 0 made worse.** Recognition is enough to
+reject, not to correct — see the writeup.
 
 ## A finding worth reporting on its own
 
@@ -158,13 +165,14 @@ Fixed since first run — the Mona Lisa false positive turned out to be two bugs
 
 Open:
 
-- **Self-repair is written but unvalidated.** `repair()` and `repair_check.py`
-  have never been run against a real fork — the development machine's CPU could
-  not reach one in reasonable time. The UI panel for it was checked against a
-  synthetic fixture, so **the layout is real and the result is not**. Whether the
-  model actually rejects its own reading is [Job 3 on the Arc box](RUNBOOK-ARC.md).
-  Until that runs, no claim about repair belongs in the pitch.
-- **The fork threshold is untuned.** 0.45 is inherited from the answer-level
+- **`ablate.py` (thinking on/off) and `probe.py` (single-pass screening) have not
+  run yet** — Jobs 4 and 6 on the Arc box.
+- **Caches are machine-specific.** Merging the two machines' caches surfaced 5
+  entries out of 1630 where the same key held different values: llama.cpp
+  generation is not bit-identical across CPUs. Everything is reproducible on one
+  machine, not across two. Re-run `traces.py --report` on whichever machine you
+  demo from.
+- ~~**The fork threshold is untuned.**~~ Swept — see above. 0.45 is inherited from the answer-level
   detector. With few traces the entropy estimate is coarse and one sample can
   swing it across the line — ununoctium read 0.59 with 5 traces and 0.406 with 4.
   Sample count is now 6, and `python traces.py --report` sweeps the threshold

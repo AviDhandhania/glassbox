@@ -2,7 +2,7 @@
   "summary": {
     "n": 14,
     "trace_samples": 7,
-    "fork_threshold": 0.45,
+    "fork_threshold": 0.46,
     "true_positive": 5,
     "false_positive": 1,
     "false_negative": 1,
