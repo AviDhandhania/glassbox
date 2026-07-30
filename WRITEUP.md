@@ -135,11 +135,9 @@ We said we would report the repair result either way. Here it is, including a
 measurement we had to throw away.
 
 The first run looked clean — 4 declines, 1 kept, 0 corrections — but review caught
-that most "competing readings" being adjudicated were *procedure* steps
-("Analyze the Request", "Final Answer Construction"). Asking which of those is
-correct is a malformed question, so the declines were the right answer to the
-wrong prompt and measured nothing. We now filter readings to real factual claims
-before adjudicating.
+that most "competing readings" were *procedure* steps ("Final Answer
+Construction"). Asking which of those is correct is a malformed question, so those
+declines measured nothing. We now filter readings to real claims first.
 
 On a clean candidate set the decline survives: offered "ununoctium is element 111"
 versus "element 112" — two genuine, mutually exclusive claims, both wrong — the
