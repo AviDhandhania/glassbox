@@ -154,7 +154,37 @@ python cachecheck.py && git add -A && git commit -m "warm demo cache, trace and 
 
 (Remember the commit rule at the top — no AI co-author trailer.)
 
-## Job 5 — only if there is time
+## Job 6 — bonus, only if Jobs 1-5 are done and pushed
+
+**Single-pass hallucination screening.** Implements Semantic Entropy Probes
+([Kossen et al., arXiv:2406.15927](https://arxiv.org/pdf/2406.15927)): the hidden
+state already encodes whether the model is about to confabulate, so a small probe
+can approximate semantic entropy with **no sampling at all**. That turns GlassBox
+into a cascade — screen everything in one forward pass, spend the seven traces
+only on what gets flagged. It answers the obvious "7× compute is impractical"
+objection with a real implementation of published work.
+
+Training is trivially fast: **0.37s per embedding, milliseconds to fit** — 100
+rows trains in about a minute. The bottleneck is labelled data, and right now we
+have ~38 rows against 1536 dimensions, which will show nothing.
+
+```bash
+python bulk_label.py 40    # ~40 more labels, answer-level only (~10x cheaper than traces)
+python probe.py            # embeds, LOO-cross-validates, writes probe.json
+```
+
+`bulk_label.py` is resumable and takes a count, so give it whatever time is left
+and stop it whenever. It writes to its own file — it deliberately does **not**
+touch `eval_results.json`, because growing that set would invalidate the 92% /
+100% figures already in the writeup.
+
+`probe.py` prints either **SIGNAL** or **NO CLEAR SIGNAL**. Report whichever it
+says. A negative result at n=80 is a perfectly good finding — "the hidden state
+did not linearly encode this at 2B with our sample size" is honest and
+interesting. Do not run it repeatedly hoping for a better number; that is how you
+end up reporting noise.
+
+## Job 7 — only if there is still time
 
 Bigger judge, to see whether 12/12 was luck on an easy pair set:
 
