@@ -1,0 +1,252 @@
+{
+  "rows": [
+    {
+      "question": "Who painted the Mona Lisa?",
+      "label": 0,
+      "fork": 2,
+      "answer": "The Mona Lisa was painted by **Leonardo da Vinci**.",
+      "mean_entropy": 0.449,
+      "n_claims": 4,
+      "depth": 6,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking a direct factual question: \"Who painted the Mona Lisa?\"",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": true,
+          "entropy": 0.655,
+          "text": "**Identify the Subject:** The Mona Lisa.",
+          "variants": [
+            "**Recall knowledge about the Mona Lisa:** It is one of the most famous paintings in the world.",
+            "**Identify the Subject:** The subject is the artist of the Mona Lisa."
+          ]
+        },
+        {
+          "index": 3,
+          "claim": true,
+          "entropy": 0.311,
+          "text": "**Recall/Verify the Artist:** Who is universally credited with painting the Mona Lisa?",
+          "variants": [
+            "**Recall Knowledge (Mona Lisa):** The Mona Lisa is one of the most famous paintings in history."
+          ]
+        },
+        {
+          "index": 4,
+          "claim": true,
+          "entropy": 0.0,
+          "text": "**Formulate the Answer:** The artist is Leonardo da Vinci.",
+          "variants": []
+        },
+        {
+          "index": 5,
+          "claim": false,
+          "entropy": null,
+          "text": "**Refine the Answer (Optional but helpful):** Provide context (e.g., his full name, his era, or a brief note about the painting's significance) to make the answer complete.",
+          "variants": []
+        },
+        {
+          "index": 6,
+          "claim": true,
+          "entropy": 0.828,
+          "text": "**Final Check against Identity/Constraints:** (Self-Correction/Identity Check) I am Gemma 4. The answer is factual and does not require tool use or violate any knowledge constraints.",
+          "variants": [
+            "**Final Answer Construction.**",
+            "**Final Output Generation.**",
+            "**Final Check against Identity/Constraints:** (Self-Correction/Verification): I am Gemma 4. The answer is factual and within my knowledge cutoff. No tools are needed."
+          ]
+        }
+      ]
+    },
+    {
+      "question": "What is the capital of Australia?",
+      "label": 0,
+      "fork": null,
+      "answer": "The capital of Australia is **Canberra**.",
+      "mean_entropy": 0.0,
+      "n_claims": 1,
+      "depth": 4,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking for \"the capital of Australia.\"",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": false,
+          "entropy": null,
+          "text": "**Recall/Verify Knowledge:** Access knowledge base regarding Australian geography and politics.",
+          "variants": []
+        },
+        {
+          "index": 3,
+          "claim": true,
+          "entropy": 0.0,
+          "text": "**Identify the Capital:** The capital of Australia is Canberra.",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": false,
+          "entropy": null,
+          "text": "**Formulate the Answer:** State the capital clearly. (Self-Correction/Refinement: Ensure the answer is direct and accurate.)",
+          "variants": []
+        }
+      ]
+    },
+    {
+      "question": "What is the chemical symbol for gold?",
+      "label": 0,
+      "fork": 2,
+      "answer": "The chemical symbol for gold is **Au**.",
+      "mean_entropy": 0.579,
+      "n_claims": 2,
+      "depth": 4,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Identify the core question:** The user wants to know the chemical symbol for gold.",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": true,
+          "entropy": 0.579,
+          "text": "**Recall/Verify the chemical symbol for gold:** Gold is represented by the letter 'Au' in the periodic table.",
+          "variants": [
+            "**Identify the Element:** The element is gold."
+          ]
+        },
+        {
+          "index": 3,
+          "claim": false,
+          "entropy": null,
+          "text": "**Formulate the answer:** State the symbol clearly. (Optional but helpful: mention what the symbol stands for, or confirm its common usage.)",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": true,
+          "entropy": 0.579,
+          "text": "**Final Answer Check:** Is \"Au\" the correct symbol for gold? Yes. (Self-Correction: Ensure the answer is direct and accurate.)",
+          "variants": [
+            "**Final Answer Construction:** The chemical symbol for gold is Au."
+          ]
+        }
+      ]
+    },
+    {
+      "question": "Who wrote the play Hamlet?",
+      "label": 0,
+      "fork": 2,
+      "answer": "The play *Hamlet* was written by **William Shakespeare**.",
+      "mean_entropy": 0.295,
+      "n_claims": 2,
+      "depth": 5,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking, \"Who wrote the play Hamlet?\"",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": true,
+          "entropy": 0.59,
+          "text": "**Identify the Subject:** The subject is the play *Hamlet*.",
+          "variants": [
+            "**Recall knowledge about *Hamlet*:** *Hamlet* is one of the most famous tragedies in world literature.",
+            "**Recall knowledge about Hamlet:** Hamlet is a famous play."
+          ]
+        },
+        {
+          "index": 3,
+          "claim": false,
+          "entropy": null,
+          "text": "**Recall Knowledge (Hamlet):** *Hamlet* is one of the most famous tragedies in world literature.",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": true,
+          "entropy": 0.0,
+          "text": "**Determine the Author:** The author of *Hamlet* is William Shakespeare.",
+          "variants": []
+        },
+        {
+          "index": 5,
+          "claim": false,
+          "entropy": null,
+          "text": "**Formulate the Answer:** State the author clearly and concisely. (Self-Correction/Refinement: Ensure the answer is definitive.)",
+          "variants": []
+        }
+      ]
+    },
+    {
+      "question": "What is the largest planet in the solar system?",
+      "label": 0,
+      "fork": 2,
+      "answer": "The largest planet in the solar system is **Jupiter**.",
+      "mean_entropy": 0.612,
+      "n_claims": 3,
+      "depth": 5,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking for the \"largest planet in the solar system.\"",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": true,
+          "entropy": 0.828,
+          "text": "**Recall/Verify Knowledge (Solar System Planets):** The major planets are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune.",
+          "variants": [
+            "**Identify the Core Concept:** The question requires knowledge about the size ranking of planets in our solar system.",
+            "**Identify the Subject:** The question concerns planetary size within our solar system.",
+            "**Recall/Verify Knowledge (Solar System Planets):** The planets in order of size are (roughly): * Jupiter * Saturn * Uranus * Neptune * Earth * Venus * Mars"
+          ]
+        },
+        {
+          "index": 3,
+          "claim": true,
+          "entropy": 0.59,
+          "text": "**Identify the Largest Planet:** Based on standard astronomical data, Jupiter is the largest planet in the solar system.",
+          "variants": [
+            "**Recall/Verify Knowledge (Solar System Planets):** * Mercury * Venus * Earth * Mars * Jupiter * Saturn * Uranus * Neptune",
+            "**Recall/Retrieve Knowledge (Solar System Planets):** The eight major planets are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune."
+          ]
+        },
+        {
+          "index": 4,
+          "claim": true,
+          "entropy": 0.418,
+          "text": "**Formulate the Answer:** State the name clearly. (Jupiter)",
+          "variants": [
+            "**Determine Key Information (Optional but helpful):** It's important to state *why* it's the largest (size, mass)."
+          ]
+        },
+        {
+          "index": 5,
+          "claim": false,
+          "entropy": null,
+          "text": "**Add Context (Optional but helpful):** Briefly mention why it's the largest (it's a gas giant). (Self-Correction: Keep it direct unless the user asks for more detail.)",
+          "variants": []
+        }
+      ]
+    }
+  ]
+}

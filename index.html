@@ -112,6 +112,22 @@
   .cluster p { margin: 2px 0; color: var(--text-secondary); font-size: 14px; }
   .cluster.solo { border-left-color: var(--critical); }
 
+  /* reasoning trace */
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 9px 0; border-top: 1px solid var(--grid); }
+  .step:first-child { border-top: 0; }
+  .step .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .step .body { min-width: 0; }
+  .step p { margin: 0; font-size: 14.5px; }
+  .step.proc p { color: var(--muted); }
+  .step .meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  /* the fork is the finding: colour + a left rule + the label, never colour alone */
+  .step.fork { border-left: 3px solid var(--critical); padding-left: 11px; margin-left: -14px; background: color-mix(in srgb, var(--critical) 9%, transparent); }
+  .step.fork .tag { color: var(--critical); font-weight: 700; letter-spacing: 0.04em; }
+  .alt { margin: 5px 0 0; padding-left: 12px; border-left: 2px solid var(--baseline); color: var(--text-secondary); font-size: 13.5px; }
+  /* one-hue sequential ramp: width AND depth both track entropy */
+  .bar { height: 4px; border-radius: 2px; background: var(--grid); margin-top: 6px; max-width: 260px; }
+  .bar i { display: block; height: 100%; border-radius: 2px; background: var(--critical); }
+
   /* eval strip plot */
   .tiles { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 20px; }
   .tile .v { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; }
@@ -129,8 +145,9 @@
 <main>
   <h1>GlassBox</h1>
   <p class="sub">
-    Gemma answers five times. If it knows, every answer means the same thing.
-    If it's making it up, they scatter — and the invented parts light up.
+    Gemma 4 reasons out loud before it answers. We make it reason five times and
+    compare the traces step by step — so instead of just knowing the answer is
+    shaky, you see <em>the exact step</em> where it started guessing.
   </p>
 
   <div class="card">
@@ -151,10 +168,10 @@
 
 <script>
   const PRESETS = [
+    "What is the atomic radius of ununoctium in picometres?",
     "Who painted the Mona Lisa?",
-    "Who won the 1931 Ceylon national chess championship?",
     "Why did Nikola Tesla decline his 1917 Nobel Prize in Chemistry?",
-    "What is the longest river in Africa?",
+    "In which year did Ronald Fisher publish his first paper on the Behrens-Fisher problem?",
   ];
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const VERDICT = {
@@ -203,22 +220,35 @@
   q.onkeydown = (e) => e.key === "Enter" && analyse();
 
   function render(r) {
-    const v = VERDICT[r.verdict];
-    const clusters = r.clusters
-      .map(
-        (c) => `<div class="cluster ${c.length === 1 ? "solo" : ""}">
-          <b>${c.length} of ${r.n_samples} samples</b>
-          ${c.map((s) => `<p>${esc(s)}</p>`).join("")}</div>`
-      )
+    const forked = r.fork != null;
+    const steps = r.steps
+      .map((s) => {
+        const isFork = s.index === r.fork;
+        if (!s.claim)
+          return `<div class="step proc"><div class="n">${s.index}</div><div class="body">
+            <p>${esc(s.text)}</p><div class="meta">procedure — not scored</div></div></div>`;
+        const alts = s.variants
+          .map((v) => `<p class="alt">also read as: ${esc(v)}</p>`)
+          .join("");
+        return `<div class="step${isFork ? " fork" : ""}"><div class="n">${s.index}</div><div class="body">
+          <p>${esc(s.text)}</p>
+          <div class="bar"><i style="width:${Math.round(s.entropy * 100)}%"></i></div>
+          <div class="meta">${isFork ? '<span class="tag">FORK · </span>' : ""}entropy ${s.entropy.toFixed(2)} — ${s.n_clusters} reading${s.n_clusters > 1 ? "s" : ""} across ${r.n_traces} traces</div>
+          ${alts}</div></div>`;
+      })
       .join("");
+    const v = forked
+      ? { c: "var(--critical)", i: "✕", t: `reasoning forks at step ${r.fork}` }
+      : { c: "var(--good)", i: "✓", t: "reasoning holds" };
     return `<div class="card">
       <div class="verdict">
-        <span class="badge" style="color:${v.c}">${v.i} ${esc(r.verdict)}</span>
-        <span class="hero">${r.entropy.toFixed(2)} <small>semantic entropy</small></span>
-        <span class="hero" style="font-size:22px">${r.n_clusters} <small>distinct meaning${r.n_clusters > 1 ? "s" : ""} across ${r.n_samples} samples</small></span>
+        <span class="badge" style="color:${v.c}">${v.i} ${v.t}</span>
+        <span class="hero">${r.mean_entropy.toFixed(2)} <small>mean entropy over ${r.n_claims} claim step${r.n_claims === 1 ? "" : "s"}</small></span>
+        <span class="hero" style="font-size:22px">${r.n_traces} <small>reasoning traces compared</small></span>
       </div>
-      <p class="answer">${highlight(r.answer, r.spans)}</p>
-      <h2>What the five samples actually said</h2>${clusters}
+      <p class="answer">${esc(r.answer)}</p>
+      <h2>Inside the reasoning</h2>
+      ${steps}
     </div>`;
   }
 

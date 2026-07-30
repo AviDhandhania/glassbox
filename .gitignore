@@ -1,7 +1,11 @@
 # GGUF weights - gigabytes, and re-downloadable via the README
 models/
 
-# derived at runtime
-cache.json
+# cache.json IS committed on purpose: it holds every generation and judgement
+# keyed by (model, seed, temperature, prompt), so a fresh clone replays the
+# demo instantly instead of spending ~40s per reasoning trace regenerating it.
+# Delete it to force a cold re-run.
+
 __pycache__/
 *.pyc
+*.png

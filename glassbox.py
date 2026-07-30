@@ -21,26 +21,48 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = pathlib.Path(__file__).parent
-MODEL_PATH = HERE / "models" / "gemma-3-1b-it-Q4_K_M.gguf"
+MODEL_PATH = HERE / "models" / "gemma-4-E2B-it-Q4_K_M.gguf"
 # The judge only ever runs a single forward pass - no tokens are generated - so a
-# bigger model costs far less here than it would for answering. Point this at the
-# same file as MODEL_PATH to run everything on one model.
-JUDGE_PATH = HERE / "models" / "gemma-3-4b-it-Q4_K_M.gguf"
+# bigger model costs far less here than it would for answering. Point this at a
+# larger GGUF to trade latency for judge accuracy.
+JUDGE_PATH = HERE / "models" / "gemma-4-E2B-it-Q4_K_M.gguf"
 
 N_SAMPLES = 5
 MAX_TOKENS = 64  # short answers judge better AND highlight better
+THINK_TOKENS = 700  # a Gemma 4 reasoning trace needs room; 700 covers our questions
 TEMP = 0.9
-N_CTX = 2048  # prompts here are tiny; small context keeps CPU prefill quick
+N_CTX = 4096  # thinking traces are long - 2048 truncates them
 WORKERS = 4  # callers stay threaded, but the model lock serialises - see _llm()
 
 # P(YES) above this counts as "same meaning". judgecheck tunes it - do not guess.
-JUDGE_THRESHOLD = 0.96
+JUDGE_THRESHOLD = 0.91
 # Verdict cut-offs from eval.py's sweep over 24 labelled questions - do not guess.
 # CONFABULATED sits mid-way through the winning range [0.32, 0.59]; grounded
 # questions topped out at 0.311 and caught confabulations started at 0.59.
 SHAKY, CONFABULATED = 0.15, 0.45
 
-GEMMA_TURN = "<start_of_turn>user\n{}<end_of_turn>\n<start_of_turn>model\n"
+THINK = "<|think|>"  # Gemma 4 special token: emit a reasoning trace before answering
+_formatters = {}
+
+
+def _prompt_for(llm, messages):
+    """Render messages with the model's OWN chat template.
+
+    Worth the extra machinery: Gemma 3's `<start_of_turn>` markers are not
+    special tokens in Gemma 4 (they tokenise as seven ordinary tokens), so a
+    hand-rolled wrapper silently mis-frames every prompt and quietly
+    de-calibrates the judge. Asking the GGUF for its template cannot drift.
+    """
+    if id(llm) not in _formatters:
+        from llama_cpp.llama_chat_format import Jinja2ChatFormatter
+
+        _formatters[id(llm)] = Jinja2ChatFormatter(
+            template=llm.metadata["tokenizer.chat_template"],
+            bos_token=llm.detokenize([llm.token_bos()]).decode(),
+            eos_token=llm.detokenize([llm.token_eos()]).decode(),
+            add_generation_prompt=True,
+        )
+    return _formatters[id(llm)](messages=messages).prompt
 
 CACHE_PATH = HERE / "cache.json"
 _cache = json.loads(CACHE_PATH.read_text(encoding="utf-8")) if CACHE_PATH.exists() else {}
@@ -165,7 +187,8 @@ def p_yes(prompt):
     yes_id, no_id = _yes_no_ids[JUDGE_PATH]
 
     with _model_lock:
-        toks = llm.tokenize(GEMMA_TURN.format(prompt).encode(), add_bos=True, special=True)
+        rendered = _prompt_for(llm, [{"role": "user", "content": prompt}])
+        toks = llm.tokenize(rendered.encode(), add_bos=True, special=True)
         # Every judge prompt opens with the same few-shot preamble, so only the
         # differing tail needs a forward pass. Rewinding n_tokens to the shared
         # prefix keeps that much of the KV cache instead of recomputing it.
@@ -332,18 +355,20 @@ def serve(port=8000):
             self._send(code, json.dumps(obj).encode(), "application/json")
 
         def do_GET(self):
-            if self.path.startswith("/api/eval"):
-                p = HERE / "eval_results.json"
-                return self._json(json.loads(p.read_text(encoding="utf-8")) if p.exists() else {})
+            for route, name in (("/api/eval", "eval_results.json"), ("/api/traces", "trace_results.json")):
+                if self.path.startswith(route):
+                    p = HERE / name
+                    return self._json(json.loads(p.read_text(encoding="utf-8")) if p.exists() else {})
             self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
 
         def do_POST(self):
             n = int(self.headers.get("Content-Length", 0))
-            q = json.loads(self.rfile.read(n) or b"{}").get("question", "").strip()
+            body = json.loads(self.rfile.read(n) or b"{}")
+            q = body.get("question", "").strip()
             if not q:
                 return self._json({"error": "no question"}, 400)
             try:
-                self._json(score(q))
+                self._json(score(q) if body.get("mode") == "answer" else inspect(q))
             except Exception as e:  # surface backend errors in the UI, not the console
                 self._json({"error": str(e)}, 500)
 
@@ -355,6 +380,141 @@ def serve(port=8000):
 
 
 # ---------------------------------------------------------------- checks
+
+
+# ---------------------------------------------------------------- reasoning traces
+#
+# Gemma 4 emits a reasoning trace before answering. Answer-level entropy tells you
+# THAT a question is shaky; step-level entropy tells you WHERE the reasoning went
+# off. Every sample plans in numbered steps, so the trace parses rather than
+# needing a heuristic.
+
+TRACE_SPLIT = re.compile(r"<channel\|>")
+STEP_SPLIT = re.compile(r"^\s*\d+\.\s+", re.M)
+# A step counts as a fork when the samples stop agreeing about it. Same scale as
+# the answer-level entropy.
+FORK = 0.45
+TRACE_SAMPLES = 4  # 5 traces total with the greedy one; each costs ~40s on CPU
+MAX_STEPS = 6  # forks land early; later steps are answer-formatting boilerplate
+
+STEP_TMPL = """Two reasoning steps come from two attempts at the same question. Do they make the same move - the same claim, the same decision, the same next action?
+
+Question: {q}
+Step A: {a}
+Step B: {b}
+
+Reply with exactly one word, YES or NO."""
+
+# Most steps are procedure ("I will check my knowledge base"), and the model
+# rewords those freely - they scored entropy 1.0 while the step carrying the
+# actual factual error scored 0.69. Ranking on raw entropy therefore points at
+# the wrong step. Only steps that assert something can be wrong, so we score
+# those and mark the rest as procedure.
+CLAIM_TMPL = """Does this reasoning step assert a specific fact - a name, number, date, identity, or definite statement about the world?
+
+Answer NO if it only describes a plan or a procedure, such as deciding what to look up, how to structure a response, or checking whether information is available.
+
+Step: {s}
+
+Reply with exactly one word, YES or NO."""
+
+
+def think(question, seed, temperature, max_tokens=THINK_TOKENS):
+    """One reasoning pass. Returns the raw text, trace and answer together."""
+    key = f"think|{MODEL_PATH.name}|{seed}|{temperature}|{max_tokens}|{question}"
+    with _cache_lock:
+        if key in _cache:
+            return _cache[key]
+
+    with _model_lock:
+        llm = _llm()
+        out = llm.create_chat_completion(
+            messages=[{"role": "system", "content": THINK}, {"role": "user", "content": question}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            seed=seed,
+        )
+        _last_toks.pop(id(llm), None)  # generation rewrote the KV cache
+    text = out["choices"][0]["message"]["content"]
+
+    with _cache_lock:
+        _cache[key] = text
+        CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+    return text
+
+
+def parse_trace(text):
+    """-> (steps, answer). Steps keep their prose; the answer is what the user sees."""
+    parts = TRACE_SPLIT.split(text, maxsplit=1)
+    trace, answer = (parts[0], parts[1]) if len(parts) == 2 else (text, "")
+    trace = trace.split("\n", 1)[-1] if trace.startswith("<|channel>") else trace
+    steps = [" ".join(s.split()) for s in STEP_SPLIT.split(trace)[1:]]
+    return [s for s in steps if s], " ".join(answer.split())
+
+
+def is_claim(step):
+    return p_yes(CLAIM_TMPL.format(s=step)) >= 0.5
+
+
+def step_entropy(question, traces, max_steps=MAX_STEPS):
+    """Per-step semantic entropy across N reasoning traces, aligned by position.
+
+    ponytail: positional alignment - step 3 of one trace is compared with step 3
+    of the others. Gemma 4 plans in a consistent order for a given question, so
+    this holds in practice; if a sample inserts an extra step everything after it
+    shifts by one and that step reads as a fork. Content-based alignment is the
+    upgrade if that shows up.
+    """
+    depth = min(min(len(t) for t in traces), max_steps)
+    out = []
+    for i in range(depth):
+        variants = [t[i] for t in traces]
+        claim = is_claim(variants[0])
+        clusters = []
+        if claim:  # procedure steps are reworded freely; scoring them is noise
+            for j, v in enumerate(variants):
+                for c in clusters:
+                    if p_yes(STEP_TMPL.format(q=question, a=variants[c[0]], b=v)) >= JUDGE_THRESHOLD:
+                        c.append(j)
+                        break
+                else:
+                    clusters.append([j])
+        out.append(
+            {
+                "index": i + 1,
+                "text": variants[0],
+                "claim": claim,
+                "entropy": round(entropy(clusters, len(variants)), 3) if claim else None,
+                "n_clusters": len(clusters) if claim else None,
+                "variants": [variants[c[0]] for c in clusters[1:]],  # the divergent readings
+            }
+        )
+    return out
+
+
+def inspect(question, n=TRACE_SAMPLES):
+    """Sample N reasoning traces, score every step, and locate the fork."""
+    primary_steps, primary_answer = parse_trace(think(question, seed=0, temperature=0.0))
+
+    samples = [parse_trace(think(question, i + 1, TEMP))[0] for i in range(n)]
+    traces = [t for t in ([primary_steps] + samples) if t]
+    if not traces:
+        return {"question": question, "error": "no parseable reasoning trace"}
+
+    steps = step_entropy(question, traces)
+    claims = [s for s in steps if s["claim"]]
+    fork = next((s["index"] for s in claims if s["entropy"] >= FORK), None)
+    return {
+        "question": question,
+        "answer": primary_answer,
+        "steps": steps,
+        "fork": fork,
+        "n_traces": len(traces),
+        "depth": len(steps),
+        "n_claims": len(claims),
+        # averaged over claim steps only - procedure steps carry no signal
+        "mean_entropy": round(sum(s["entropy"] for s in claims) / len(claims), 3) if claims else 0.0,
+    }
 
 
 # (question, answer A, answer B, do they state the same fact?)
@@ -429,6 +589,8 @@ if __name__ == "__main__":
         demo()
     elif cmd == "judgecheck":
         judgecheck()
+    elif cmd == "inspect":
+        print(json.dumps(inspect(" ".join(sys.argv[2:])), indent=2))
     elif cmd == "serve":
         serve()
     elif cmd == "ask":
