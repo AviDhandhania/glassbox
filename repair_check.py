@@ -55,6 +55,16 @@ def main():
         if not rep:
             print("     no divergent claim step - nothing to repair")
             continue
+        if rep.get("declined"):
+            # It rejected every reading it produced. The guardrail failing closed
+            # is the intended behaviour, so record it rather than calling it a miss.
+            print(f"     step {rep['step']} (h={rep['entropy']}), {len(rep['readings'])} readings, "
+                  f"DECLINED - none of them")
+            for r in rep["readings"]:
+                print(f"         {r[:96]}")
+            print(f"     BEFORE: {rep['answer_before'][:150]}")
+            print("     AFTER : no repair attempted")
+            continue
         print(f"     step {rep['step']} (h={rep['entropy']}), {len(rep['readings'])} readings, "
               f"picked #{rep['chosen_index']+1}{' (its original)' if rep['was_original'] else ' - CHANGED ITS MIND'}")
         for j, r in enumerate(rep["readings"]):
@@ -73,8 +83,12 @@ def main():
 
 def report(rows):
     reps = [r for r in rows if r["repair"]]
-    changed = [r for r in reps if not r["repair"]["was_original"]]
-    scored = [r for r in reps if r["truth"]]
+    # A declined repair has no chosen reading and no after-answer, so it cannot be
+    # scored for or against - it is counted on its own.
+    declined = [r for r in reps if r["repair"].get("declined")]
+    acted = [r for r in reps if not r["repair"].get("declined")]
+    changed = [r for r in acted if not r["repair"]["was_original"]]
+    scored = [r for r in acted if r["truth"]]
     fixed = [r for r in scored
              if r["truth"].lower() in r["repair"]["answer_after"].lower()
              and r["truth"].lower() not in r["repair"]["answer_before"].lower()]
@@ -84,6 +98,8 @@ def report(rows):
     summary = {
         "n": len(rows),
         "had_divergent_step": len(reps),
+        "declined_all_readings": len(declined),
+        "adjudicated": len(acted),
         "model_changed_its_mind": len(changed),
         "checkable": len(scored),
         "repaired": len(fixed),
@@ -94,7 +110,8 @@ def report(rows):
     OUT.write_text(json.dumps({"summary": summary, "rows": rows}, indent=2), encoding="utf-8")
     print("\n" + json.dumps(summary, indent=2))
     print(f"\nSLIDE: shown its own competing readings, the model changed its answer on "
-          f"{len(changed)}/{len(reps)} forks; {len(fixed)} became correct, {len(broke)} regressed")
+          f"{len(changed)}/{len(acted)} forks it adjudicated; {len(fixed)} became correct, "
+          f"{len(broke)} regressed; it declined all readings on {len(declined)}")
 
 
 if __name__ == "__main__":
