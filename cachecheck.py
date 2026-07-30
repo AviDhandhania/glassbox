@@ -21,8 +21,19 @@ PRESETS = [
     "In which year did Ronald Fisher publish his first paper on the Behrens-Fisher problem?",
 ]
 
-g.MODEL_PATH = pathlib.Path("no-weights-on-purpose.gguf")
-g.JUDGE_PATH = pathlib.Path("no-weights-on-purpose.gguf")
+def _no_weights(path=None):
+    """Stand in for _llm() so any cache miss fails here instead of loading 2.9GB.
+
+    Repointing MODEL_PATH/JUDGE_PATH cannot do this: every cache key embeds
+    MODEL_PATH.name (see think/_gen/p_yes/repair), so renaming the model renames
+    every key and the check misses everything by construction - it would fail
+    even against a perfectly warm cache. Blocking the loader leaves the keys
+    untouched, which is what actually needs testing.
+    """
+    raise RuntimeError("cache miss - this preset would need the model")
+
+
+g._llm = _no_weights
 
 ok = True
 for q in PRESETS:
