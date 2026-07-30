@@ -1,176 +1,198 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GlassBox — hallucination detection for Gemma</title>
+<title>GlassBox — inside Gemma 4's reasoning</title>
 <style>
   :root {
     color-scheme: dark;
-    --surface-1: #1a1a19;
-    --plane: #0d0d0d;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-    --grounded: #3987e5;
-    --critical: #d03b3b;
-    --good: #0ca30c;
-    --warning: #fab219;
+    --bg: #191817;
+    --surface: #22211f;
+    --surface-2: #2b2a27;
+    --line: #35332f;
+    --line-soft: #2c2b28;
+    --ink: #f5f4f0;
+    --ink-2: #b8b4ab;
+    --ink-3: #85817a;
+    --accent: #d97757;
+    --good: #4ba34b;
+    --warn: #d9a13f;
+    --crit: #e06666;
+    --series-1: #3987e5;
+    --series-2: #d03b3b;
+    --radius: 14px;
   }
   @media (prefers-color-scheme: light) {
     :root:where(:not([data-theme="dark"])) {
       color-scheme: light;
-      --surface-1: #fcfcfb;
-      --plane: #f9f9f7;
-      --text-primary: #0b0b0b;
-      --text-secondary: #52514e;
-      --grid: #e1e0d9;
-      --baseline: #c3c2b7;
-      --border: rgba(11, 11, 11, 0.1);
-      --grounded: #2a78d6;
+      --bg: #faf9f6;
+      --surface: #ffffff;
+      --surface-2: #f4f2ed;
+      --line: #e3e0d8;
+      --line-soft: #ecebe5;
+      --ink: #1a1917;
+      --ink-2: #55524c;
+      --ink-3: #8a867e;
+      --accent: #c2603c;
+      --good: #2f7d32;
+      --crit: #c33b3b;
+      --series-1: #2a78d6;
+      --series-2: #d03b3b;
     }
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    padding: 32px 20px 80px;
-    background: var(--plane);
-    color: var(--text-primary);
-    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 0 20px 90px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15.5px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 860px; margin: 0 auto; }
-  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
-  .sub { color: var(--text-secondary); margin: 0 0 28px; }
+  main { max-width: 880px; margin: 0 auto; }
+
+  header { padding: 60px 0 34px; }
+  h1 {
+    font-size: clamp(30px, 5vw, 40px); margin: 0 0 12px;
+    letter-spacing: -0.028em; font-weight: 620; line-height: 1.1;
+  }
+  h1 .dot { color: var(--accent); }
+  .lede { font-size: 17px; color: var(--ink-2); margin: 0; max-width: 62ch; }
+  .lede em { color: var(--ink); font-style: normal; font-weight: 550; }
+  .meta-line {
+    margin-top: 16px; font-size: 13px; color: var(--ink-3);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .meta-line span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta-line .sep { color: var(--line); }
+
   .card {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px; margin-bottom: 18px;
   }
-  .row { display: flex; gap: 10px; }
+
+  .ask { display: flex; gap: 10px; }
   input[type="text"] {
-    flex: 1;
-    padding: 12px 14px;
-    font: inherit;
-    color: var(--text-primary);
-    background: var(--plane);
-    border: 1px solid var(--baseline);
-    border-radius: 8px;
+    flex: 1; padding: 13px 16px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    transition: border-color .15s;
   }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
   button {
-    font: inherit;
-    font-weight: 600;
-    padding: 12px 20px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--grounded);
-    color: #fff;
-    cursor: pointer;
+    font: inherit; font-weight: 600; padding: 13px 22px; border: 0;
+    border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer;
+    transition: filter .15s;
   }
-  button:disabled { opacity: 0.5; cursor: progress; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .chip {
-    font-size: 13px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--baseline);
-    background: none;
-    color: var(--text-secondary);
-    font-weight: 400;
+    font-size: 13px; font-weight: 450; padding: 7px 13px; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+    transition: border-color .15s, color .15s;
   }
+  .chip:hover { border-color: var(--accent); color: var(--ink); filter: none; }
 
-  /* verdict + hero figure */
-  .verdict { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  /* ---- verdict ---- */
+  .verdict { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
   .badge {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-weight: 600; font-size: 14px;
-    padding: 5px 12px; border-radius: 999px;
-    border: 1px solid currentColor;
+    display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;
+    padding: 7px 14px; border-radius: 999px; border: 1px solid currentColor;
   }
-  .hero { font-size: 40px; font-weight: 650; letter-spacing: -0.03em; }
-  .hero small { font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .stats { display: flex; gap: 26px; flex-wrap: wrap; margin: 18px 0 6px; }
+  .stat .v { font-size: 30px; font-weight: 620; letter-spacing: -0.03em; line-height: 1.1; }
+  .stat .k { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; margin-top: 3px; }
 
-  .answer { font-size: 19px; line-height: 1.7; margin: 18px 0 0; }
-  /* one-hue sequential wash: alpha scales with un-supportedness.
-     wavy underline is the secondary encoding, so colour never carries it alone. */
-  .answer mark {
-    background: color-mix(in srgb, var(--critical) calc(var(--risk) * 42%), transparent);
-    color: inherit;
-    border-radius: 3px;
-    padding: 1px 2px;
-    cursor: help;
-  }
-  .answer mark[data-flag="1"] {
-    text-decoration: underline wavy var(--critical);
-    text-underline-offset: 4px;
+  .answer {
+    font-size: 16.5px; line-height: 1.65; margin: 16px 0 0; padding: 16px 18px;
+    background: var(--surface-2); border-radius: 11px; border: 1px solid var(--line-soft);
   }
 
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 24px 0 10px; font-weight: 600; }
-  .cluster { border-left: 3px solid var(--baseline); padding: 2px 0 2px 12px; margin-bottom: 10px; }
-  .cluster b { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
-  .cluster p { margin: 2px 0; color: var(--text-secondary); font-size: 14px; }
-  .cluster.solo { border-left-color: var(--critical); }
+  h2 {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--ink-3); margin: 30px 0 6px; font-weight: 650;
+  }
 
-  /* reasoning trace */
-  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 9px 0; border-top: 1px solid var(--grid); }
-  .step:first-child { border-top: 0; }
-  .step .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
-  .step .body { min-width: 0; }
-  .step p { margin: 0; font-size: 14.5px; }
-  .step.proc p { color: var(--muted); }
-  .step .meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
-  /* the fork is the finding: colour + a left rule + the label, never colour alone */
-  .step.fork { border-left: 3px solid var(--critical); padding-left: 11px; margin-left: -14px; background: color-mix(in srgb, var(--critical) 9%, transparent); }
-  .step.fork .tag { color: var(--critical); font-weight: 700; letter-spacing: 0.04em; }
-  .alt { margin: 5px 0 0; padding-left: 12px; border-left: 2px solid var(--baseline); color: var(--text-secondary); font-size: 13.5px; }
-  .alt.picked { border-left-color: var(--good); color: var(--text-primary); }
+  /* ---- reasoning spine ---- */
+  .spine { position: relative; padding-left: 26px; margin-top: 14px; }
+  .spine::before {
+    content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px;
+    width: 2px; background: var(--line);
+  }
+  .step { position: relative; padding: 11px 0; }
+  .step::before {
+    content: ""; position: absolute; left: -23px; top: 18px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--line); border: 2px solid var(--bg); box-sizing: content-box;
+  }
+  .step.claim::before { background: var(--ink-3); }
+  .step.fork::before { background: var(--crit); box-shadow: 0 0 0 4px color-mix(in srgb, var(--crit) 22%, transparent); }
+  .step.answer::before { background: var(--accent); }
+  .step p { margin: 0; font-size: 15px; }
+  .step.proc p { color: var(--ink-3); font-size: 14px; }
+  .step .meta { font-size: 12px; color: var(--ink-3); margin-top: 6px; letter-spacing: .01em; }
+  .step .meta b { color: var(--crit); letter-spacing: .05em; }
+  .step.fork {
+    background: color-mix(in srgb, var(--crit) 8%, transparent);
+    border-radius: 10px; padding: 13px 15px; margin: 4px -15px;
+  }
+  .step.fork::before { left: -38px; }
+  .alt {
+    margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--line);
+    color: var(--ink-2); font-size: 14px; background: var(--surface-2); border-radius: 0 8px 8px 0;
+  }
+  .alt.picked { border-left-color: var(--good); color: var(--ink); }
+  .bar { height: 3px; border-radius: 2px; background: var(--line); margin-top: 8px; max-width: 220px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--crit); border-radius: 2px; }
 
-  /* repair: before -> after */
-  .repair { margin-top: 22px; border-top: 1px solid var(--grid); padding-top: 18px; }
-  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
-  @media (max-width: 620px) { .ba { grid-template-columns: 1fr; } }
-  .ba > div { border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; }
-  .ba .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 7px; }
-  .ba .before { border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
-  .ba .before .lbl { color: var(--critical); }
-  .ba .after { border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+  /* ---- repair ---- */
+  .repair { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
+  .note { font-size: 14.5px; color: var(--ink-2); margin: 10px 0 0; }
+  .note b { color: var(--ink); }
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  @media (max-width: 640px) { .ba { grid-template-columns: 1fr; } }
+  .ba > div { border: 1px solid var(--line); border-radius: 11px; padding: 14px 16px; background: var(--surface-2); }
+  .ba .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; margin-bottom: 8px; }
+  .ba .before { border-color: color-mix(in srgb, var(--crit) 40%, transparent); }
+  .ba .before .lbl { color: var(--crit); }
+  .ba .after { border-color: color-mix(in srgb, var(--good) 40%, transparent); }
   .ba .after .lbl { color: var(--good); }
   .ba p { margin: 0; font-size: 14.5px; }
-  .pick { font-size: 13.5px; color: var(--text-secondary); margin: 10px 0 0; }
-  .pick b { color: var(--text-primary); }
-  /* one-hue sequential ramp: width AND depth both track entropy */
-  .bar { height: 4px; border-radius: 2px; background: var(--grid); margin-top: 6px; max-width: 260px; }
-  .bar i { display: block; height: 100%; border-radius: 2px; background: var(--critical); }
 
-  /* eval strip plot */
-  .tiles { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 20px; }
-  .tile .v { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; }
-  .tile .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-  .legend { display: flex; gap: 18px; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
-  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  /* ---- eval ---- */
+  .tiles { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 22px; }
+  .legend { display: flex; gap: 20px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 7px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); color: var(--text-secondary); }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line-soft); color: var(--ink-2); }
+  th { color: var(--ink-3); font-weight: 600; }
   td.num { font-variant-numeric: tabular-nums; text-align: right; }
-  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-  .err { color: var(--critical); }
+  details summary { cursor: pointer; color: var(--ink-3); font-size: 13px; margin-top: 14px; }
+  .err { color: var(--crit); }
   .scroll { overflow-x: auto; }
+  .muted { color: var(--ink-3); font-size: 14px; }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--line);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
 <main>
-  <h1>GlassBox</h1>
-  <p class="sub">
-    Gemma 4 reasons out loud before it answers — thousands of tokens nobody reads.
-    We make it reason seven times, align the traces step by step, and find
-    <em>the exact step</em> where it started guessing. Then we hand it back its own
-    competing versions and let it fix itself.
-    <br /><span style="color: var(--muted); font-size: 13.5px">
-      One 2.9&nbsp;GB Gemma 4 E2B on a laptop CPU. No API, no network, no second model.
-    </span>
-  </p>
+  <header>
+    <h1>GlassBox<span class="dot">.</span></h1>
+    <p class="lede">
+      Gemma 4 reasons out loud before it answers — thousands of tokens nobody reads.
+      We make it reason seven times, align the traces step by step, and find
+      <em>the exact step where it started guessing</em>. Then we hand it back its own
+      competing versions and ask which is right.
+    </p>
+    <div class="meta-line">
+      <span>One 2.9 GB Gemma 4 E2B</span><span class="sep">·</span>
+      <span>laptop CPU</span><span class="sep">·</span>
+      <span>reasoner and judge are the same model</span><span class="sep">·</span>
+      <span>no API, no network</span>
+    </div>
+  </header>
 
   <div class="card">
-    <div class="row">
+    <div class="ask">
       <input id="q" type="text" placeholder="Ask Gemma something…" autofocus />
       <button id="go">Analyse</button>
     </div>
@@ -180,8 +202,8 @@
   <div id="out"></div>
 
   <div class="card">
-    <h2 style="margin-top: 0">Measured on 24 labelled questions</h2>
-    <div id="eval"><p class="sub">Run <code>python eval.py</code> to populate this.</p></div>
+    <h2 style="margin-top: 0">Measured — 24 labelled questions</h2>
+    <div id="eval"><p class="muted">Run <code>python eval.py</code> to populate this.</p></div>
   </div>
 </main>
 
@@ -192,12 +214,8 @@
     "Why did Nikola Tesla decline his 1917 Nobel Prize in Chemistry?",
     "In which year did Ronald Fisher publish his first paper on the Behrens-Fisher problem?",
   ];
-  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const VERDICT = {
-    grounded: { c: "var(--good)", i: "✓" },
-    shaky: { c: "var(--warning)", i: "!" },
-    "likely confabulated": { c: "var(--critical)", i: "✕" },
-  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const clip = (s, n) => (s.length > n ? s.slice(0, n).trimEnd() + "…" : s);
 
   const chips = document.getElementById("chips");
   PRESETS.forEach((p) => {
@@ -208,26 +226,13 @@
     chips.append(b);
   });
 
-  // Rebuild the answer with <mark> per clause. Gaps between spans (commas,
-  // spaces) render as plain text, so the original wording is never reflowed.
-  function highlight(text, spans) {
-    let html = "", cur = 0;
-    for (const s of spans) {
-      const risk = 1 - s.support;
-      html += esc(text.slice(cur, s.start));
-      html += `<mark style="--risk:${risk.toFixed(2)}" data-flag="${s.support < 0.5 ? 1 : 0}"
-        title="${Math.round(s.support * 100)}% of samples support this">${esc(s.text)}</mark>`;
-      cur = s.end;
-    }
-    return html + esc(text.slice(cur));
-  }
-
   async function analyse() {
     const question = q.value.trim();
     if (!question) return;
     go.disabled = true;
-    out.innerHTML = `<div class="card"><p class="sub">Reasoning seven times, aligning the traces, then adjudicating any fork…
-      a cold question runs several minutes on CPU. The four presets are cached and instant.</p></div>`;
+    out.innerHTML = `<div class="card"><p class="muted"><span class="spinner"></span>
+      &nbsp;Reasoning seven times, aligning the traces, adjudicating any fork…
+      a cold question takes several minutes on CPU. The presets are cached and instant.</p></div>`;
     try {
       const r = await (await fetch("/", { method: "POST", body: JSON.stringify({ question }) })).json();
       out.innerHTML = r.error ? `<div class="card err">${esc(r.error)}</div>` : render(r);
@@ -239,149 +244,134 @@
   go.onclick = analyse;
   q.onkeydown = (e) => e.key === "Enter" && analyse();
 
+  function stepRow(s, r) {
+    const isFork = s.index === r.fork;
+    if (!s.claim)
+      return `<div class="step proc"><p>${esc(s.text)}</p>
+        <div class="meta">procedure — not scored</div></div>`;
+
+    // The answer already appears in full above; repeating it here just doubles a
+    // wall of text. Show that it was scored, not the text again.
+    const body = s.is_answer
+      ? `<p style="color:var(--ink-2)">${esc(clip(s.text, 150))}</p>`
+      : `<p>${esc(s.text)}</p>`;
+    const alts = s.variants
+      .map((v) => `<p class="alt">${s.is_answer ? "another trace answered" : "also read as"}: ${esc(clip(v, 240))}</p>`)
+      .join("");
+    const tag = s.is_answer ? "final answer · " : isFork ? "<b>FORK</b> · " : "";
+    const cls = "step claim" + (isFork ? " fork" : "") + (s.is_answer ? " answer" : "");
+    return `<div class="${cls}">${body}
+      <div class="bar"><i style="width:${Math.round(s.entropy * 100)}%"></i></div>
+      <div class="meta">${tag}entropy ${s.entropy.toFixed(2)} — ${s.n_clusters} reading${s.n_clusters > 1 ? "s" : ""}
+        across ${s.n_aligned} trace${s.n_aligned === 1 ? "" : "s"}${s.absent ? `, ${s.absent} never made this move` : ""}</div>
+      ${alts}</div>`;
+  }
+
   function render(r) {
     const forked = r.fork != null;
-    const steps = r.steps
-      .map((s) => {
-        const isFork = s.index === r.fork;
-        if (!s.claim)
-          return `<div class="step proc"><div class="n">${s.index}</div><div class="body">
-            <p>${esc(s.text)}</p><div class="meta">procedure — not scored</div></div></div>`;
-        const alts = s.variants
-          .map((v) => `<p class="alt">${s.is_answer ? "other traces answered" : "also read as"}: ${esc(v)}</p>`)
-          .join("");
-        const label = s.is_answer
-          ? '<span style="color:var(--text-secondary);font-weight:700">FINAL ANSWER · </span>'
-          : isFork
-            ? '<span class="tag">FORK · </span>'
-            : "";
-        return `<div class="step${isFork ? " fork" : ""}"><div class="n">${s.is_answer ? "→" : s.index}</div><div class="body">
-          <p>${esc(s.text)}</p>
-          <div class="bar"><i style="width:${Math.round(s.entropy * 100)}%"></i></div>
-          <div class="meta">${label}entropy ${s.entropy.toFixed(2)} — ${s.n_clusters} reading${s.n_clusters > 1 ? "s" : ""} across ${s.n_aligned} traces</div>
-          ${alts}</div></div>`;
-      })
-      .join("");
     const v = forked
-      ? { c: "var(--critical)", i: "✕", t: `reasoning forks at step ${r.fork}` }
+      ? { c: "var(--crit)", i: "✕", t: `reasoning forks at step ${r.fork}` }
       : { c: "var(--good)", i: "✓", t: "reasoning holds" };
     return `<div class="card">
-      <div class="verdict">
-        <span class="badge" style="color:${v.c}">${v.i} ${v.t}</span>
-        <span class="hero">${r.mean_entropy.toFixed(2)} <small>mean entropy over ${r.n_claims} claim step${r.n_claims === 1 ? "" : "s"}</small></span>
-        <span class="hero" style="font-size:22px">${r.n_traces} <small>reasoning traces compared</small></span>
+      <div class="verdict"><span class="badge" style="color:${v.c}">${v.i} ${v.t}</span></div>
+      <div class="stats">
+        <div class="stat"><div class="v">${r.mean_entropy.toFixed(2)}</div>
+          <div class="k">mean entropy · ${r.n_claims} claim step${r.n_claims === 1 ? "" : "s"}</div></div>
+        <div class="stat"><div class="v">${r.n_traces}</div><div class="k">traces compared</div></div>
+        <div class="stat"><div class="v">${r.depth}</div><div class="k">reasoning steps</div></div>
       </div>
       <p class="answer">${esc(r.answer)}</p>
       <h2>Inside the reasoning</h2>
-      ${steps}
+      <div class="spine">${r.steps.map((s) => stepRow(s, r)).join("")}</div>
       ${repairPanel(r.repair)}
     </div>`;
   }
 
-  // The payoff: hand the model its own competing readings, let it adjudicate,
-  // then re-run the reasoning from that step. No external source consulted.
   function repairPanel(rep) {
     if (!rep) return "";
+    const opts = (picked) => rep.readings
+      .map((t, i) => `<p class="alt${picked === i ? " picked" : ""}">${picked === i ? "✓ " : ""}${esc(clip(t, 240))}</p>`)
+      .join("");
+
     if (rep.declined)
       return `<div class="repair">
         <h2 style="margin-top:0">Self-repair — declined</h2>
-        <p class="pick">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own
-          ${rep.readings.length} competing readings and asked which is correct —
-          <b>it rejected all of them.</b></p>
-        ${rep.readings.map((t) => `<p class="alt">${esc(t)}</p>`).join("")}
-        <p class="pick">So the answer is left alone and flagged. The model can tell it does not
-          know, even where it cannot recall the right value — and a guardrail that
-          swaps one wrong claim for another is worse than one that stops.</p>
+        <p class="note">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own
+          ${rep.readings.length} competing readings and asked which is correct.
+          <b>It rejected all of them.</b></p>
+        ${opts(-1)}
+        <p class="note">So the answer is left alone and flagged. The model can tell it does not know,
+          even where it cannot recall the right value — and a guardrail that swaps one wrong claim
+          for another is worse than one that stops.</p>
       </div>`;
-    const opts = rep.readings
-      .map((t, i) => `<p class="alt${i === rep.chosen_index ? " picked" : ""}">${i === rep.chosen_index ? "✓ " : ""}${esc(t)}</p>`)
-      .join("");
-    const changed = rep.answer_before.trim() !== rep.answer_after.trim();
+
     return `<div class="repair">
       <h2 style="margin-top:0">Self-repair — the model resolves its own fork</h2>
-      <p class="pick">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own ${rep.readings.length}
-        competing readings and asked which is correct — nothing external was consulted.</p>
-      ${opts}
-      <p class="pick">${rep.was_original
-          ? "It stood by its original reading, and the answer was re-derived from it."
-          : "<b>It rejected its own first answer</b> and re-reasoned from the option it picked."}</p>
+      <p class="note">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own
+        ${rep.readings.length} competing readings and asked which is correct —
+        nothing external was consulted.</p>
+      ${opts(rep.chosen_index)}
+      <p class="note">${rep.was_original
+        ? "It stood by its original reading, and the answer was re-derived from it."
+        : "<b>It rejected its own first answer</b> and re-reasoned from the option it picked."}</p>
       <div class="ba">
-        <div class="before"><div class="lbl">Before</div><p>${esc(rep.answer_before)}</p></div>
-        <div class="after"><div class="lbl">After repair</div><p>${esc(rep.answer_after)}</p></div>
+        <div class="before"><div class="lbl">Before</div><p>${esc(clip(rep.answer_before, 420))}</p></div>
+        <div class="after"><div class="lbl">After repair</div><p>${esc(clip(rep.answer_after, 420))}</p></div>
       </div>
-      ${changed ? "" : '<p class="pick">The answer did not change.</p>'}
     </div>`;
   }
 
-  // --- eval: two-row strip plot, position encodes group as well as colour
-  fetch("/api/eval")
-    .then((r) => r.json())
-    .then((d) => {
-      if (!d.summary) return;
-      const s = d.summary, b = s.best || {}, W = 800, H = 364, PAD = 40, FLOOR = 310;
-      const x = (e) => PAD + e * (W - PAD * 2);
-      const STEP = 11, R = 4.5;
-      const rows = [
-        { label: "Answerable", label2: "expects agreement", base: 150, colour: "var(--grounded)", lab: 0 },
-        { label: "Obscure / false-premise", label2: "expects scatter", base: 310, colour: "var(--critical)", lab: 1 },
-      ];
+  // ---- eval: two-row stacked dot plot (identical values stack instead of overlapping)
+  fetch("/api/eval").then((r) => r.json()).then((d) => {
+    if (!d.summary) return;
+    const s = d.summary, b = s.best || {}, W = 800, H = 364, PAD = 40, FLOOR = 310, STEP = 11, R = 4.5;
+    const x = (e) => PAD + e * (W - PAD * 2);
+    const rows = [
+      { label: "Answerable", sub: "expects agreement", base: 150, colour: "var(--series-1)", lab: 0 },
+      { label: "Obscure / false-premise", sub: "expects scatter", base: FLOOR, colour: "var(--series-2)", lab: 1 },
+    ];
+    const dots = rows.flatMap((row) => {
+      const seen = {};
+      return d.rows.filter((r) => r.label === row.lab).map((r) => {
+        const k = r.entropy.toFixed(2);
+        const cy = row.base - (seen[k] = (seen[k] || 0) + 1) * STEP + STEP / 2;
+        return `<circle cx="${x(r.entropy).toFixed(1)}" cy="${cy}" r="${R}" fill="${row.colour}"
+          stroke="var(--surface)" stroke-width="2"><title>${esc(r.question)} — entropy ${r.entropy}</title></circle>`;
+      });
+    }).join("");
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) =>
+      `<line x1="${x(t)}" y1="14" x2="${x(t)}" y2="${FLOOR}" stroke="var(--line-soft)" />
+       <text x="${x(t)}" y="${H - 12}" fill="var(--ink-3)" font-size="11" text-anchor="middle">${t}</text>`).join("");
+    const bases = rows.map((r) =>
+      `<line x1="${PAD}" y1="${r.base}" x2="${W - PAD}" y2="${r.base}" stroke="var(--line)" />`).join("");
+    const thr = b.threshold
+      ? `<line x1="${x(b.threshold)}" y1="14" x2="${x(b.threshold)}" y2="${FLOOR}" stroke="var(--ink-2)"
+           stroke-width="2" stroke-dasharray="4 3" />
+         <text x="${x(b.threshold) + 7}" y="26" fill="var(--ink-2)" font-size="11">answer-level threshold ${b.threshold}</text>`
+      : "";
 
-      // Most questions land on one of a handful of entropy values — 11 of them
-      // sit at exactly 0.00. Drawn as plain dots they would overlap into one
-      // mark and hide the sample size, so identical values stack upward.
-      const dots = rows
-        .flatMap((row) => {
-          const seen = {};
-          return d.rows
-            .filter((r) => r.label === row.lab)
-            .map((r) => {
-              const k = r.entropy.toFixed(2);
-              const cy = row.base - (seen[k] = (seen[k] || 0) + 1) * STEP + STEP / 2;
-              return `<circle cx="${x(r.entropy).toFixed(1)}" cy="${cy}" r="${R}"
-                fill="${row.colour}" stroke="var(--surface-1)" stroke-width="2">
-                <title>${esc(r.question)} — entropy ${r.entropy}</title></circle>`;
-            });
-        })
-        .join("");
-      const ticks = [0, 0.25, 0.5, 0.75, 1]
-        .map(
-          (t) => `<line x1="${x(t)}" y1="14" x2="${x(t)}" y2="${FLOOR}" stroke="var(--grid)" />
-            <text x="${x(t)}" y="${H - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${t}</text>`
-        )
-        .join("");
-      const bases = rows
-        .map((r) => `<line x1="${PAD}" y1="${r.base}" x2="${W - PAD}" y2="${r.base}" stroke="var(--baseline)" />`)
-        .join("");
-      const thr = b.threshold
-        ? `<line x1="${x(b.threshold)}" y1="14" x2="${x(b.threshold)}" y2="${FLOOR}"
-             stroke="var(--text-secondary)" stroke-width="2" stroke-dasharray="4 3" />
-           <text x="${x(b.threshold) + 6}" y="26" fill="var(--text-secondary)" font-size="11">threshold ${b.threshold}</text>`
-        : "";
-
-      document.getElementById("eval").innerHTML = `
-        <div class="tiles">
-          <div class="tile"><div class="v" style="color:var(--good)">${b.recall != null ? Math.round(b.recall * 100) + "%" : "—"}</div><div class="k">confabulations caught</div></div>
-          <div class="tile"><div class="v">${b.precision != null ? Math.round(b.precision * 100) + "%" : "—"}</div><div class="k">precision</div></div>
-          <div class="tile"><div class="v">${s.mean_entropy_grounded ?? "—"}</div><div class="k">mean entropy · answerable</div></div>
-          <div class="tile"><div class="v">${s.mean_entropy_confabulated ?? "—"}</div><div class="k">mean entropy · obscure</div></div>
-        </div>
-        <div class="legend">
-          ${rows.map((r) => `<span><i style="background:${r.colour}"></i>${r.label}</span>`).join("")}
-        </div>
-        <div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
-          aria-label="Semantic entropy for each of ${s.n} questions, stacked where values repeat, split by whether the question is answerable. Answerable questions cluster at zero; obscure ones spread above the threshold.">
-          ${ticks}${bases}${thr}
-          ${rows.map((r) => `<text x="${PAD}" y="${r.base + 16}" fill="var(--text-secondary)" font-size="12" font-weight="600">${r.label} <tspan fill="var(--muted)" font-weight="400">— ${r.label2}</tspan></text>`).join("")}
-          ${dots}
-        </svg></div>
-        <details><summary>Table view (${s.n} questions)</summary>
-          <div class="scroll"><table><thead><tr><th>Question</th><th>Group</th><th class="num">Entropy</th></tr></thead><tbody>
-          ${d.rows
-            .slice()
-            .sort((a, c) => a.entropy - c.entropy)
-            .map((r) => `<tr><td>${esc(r.question)}</td><td>${r.label ? "Obscure" : "Answerable"}</td><td class="num">${r.entropy}</td></tr>`)
-            .join("")}
-          </tbody></table></div>
-        </details>`;
-    });
+    document.getElementById("eval").innerHTML = `
+      <div class="tiles">
+        <div class="stat"><div class="v" style="color:var(--good)">${b.recall != null ? Math.round(b.recall * 100) + "%" : "—"}</div><div class="k">confabulations caught</div></div>
+        <div class="stat"><div class="v">${b.precision != null ? Math.round(b.precision * 100) + "%" : "—"}</div><div class="k">precision</div></div>
+        <div class="stat"><div class="v">${s.mean_entropy_grounded ?? "—"}</div><div class="k">mean entropy · answerable</div></div>
+        <div class="stat"><div class="v">${s.mean_entropy_confabulated ?? "—"}</div><div class="k">mean entropy · obscure</div></div>
+      </div>
+      <div class="legend">${rows.map((r) => `<span><i style="background:${r.colour}"></i>${r.label}</span>`).join("")}</div>
+      <div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
+        aria-label="Semantic entropy for each of ${s.n} questions, stacked where values repeat. Answerable questions cluster at zero; obscure ones spread above the threshold.">
+        ${ticks}${bases}${thr}
+        ${rows.map((r) => `<text x="${PAD}" y="${r.base + 17}" fill="var(--ink-2)" font-size="12" font-weight="600">${r.label}
+          <tspan fill="var(--ink-3)" font-weight="400">— ${r.sub}</tspan></text>`).join("")}
+        ${dots}
+      </svg></div>
+      <p class="muted" style="margin-top:10px">This chart measures whole answers over 5 samples — a different
+        quantity from the step-level entropy above, so its threshold differs.</p>
+      <details><summary>Table view (${s.n} questions)</summary>
+        <div class="scroll"><table><thead><tr><th>Question</th><th>Group</th><th class="num">Entropy</th></tr></thead><tbody>
+        ${d.rows.slice().sort((a, c) => a.entropy - c.entropy).map((r) =>
+          `<tr><td>${esc(r.question)}</td><td>${r.label ? "Obscure" : "Answerable"}</td><td class="num">${r.entropy}</td></tr>`).join("")}
+        </tbody></table></div>
+      </details>`;
+  });
 </script>
