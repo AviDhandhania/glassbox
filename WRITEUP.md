@@ -21,18 +21,14 @@ alone, and it is what a guardrail actually needs.
 
 ## How it works
 
-1. **Seven reasoning traces.** One greedy, six sampled at temp 0.9 with distinct
-   seeds. Gemma 4 emits `<|channel>thought` … `<channel|>` and plans in numbered
-   steps, so traces parse rather than needing a heuristic.
-2. **Classify every step** as *procedure* ("I'll check my knowledge base") or
-   *assertion* ("Ununoctium is element 111"). Only assertions can be wrong.
-3. **Align by role, across traces.** For each assertion, find the step in every
-   other trace that plays the same role.
-4. **Cluster and score.** Normalised Shannon entropy over the aligned group.
-   0 = every trace made the same move; 1 = they all differ.
-5. **Repair.** Hand the model its own competing readings for the most divergent
-   step, let it adjudicate, rebuild the trace with its choice, and re-reason from
-   there.
+**Seven reasoning traces** — one greedy, six at temp 0.9 with distinct seeds.
+Gemma 4 emits `<|channel>thought` … `<channel|>` and plans in numbered steps, so
+traces parse rather than needing a heuristic. **Every step is classified** as
+procedure ("I'll check my knowledge base") or assertion ("Ununoctium is element
+111"); only assertions can be wrong. Each assertion is **aligned by role** against
+every other trace, then **clustered and scored** with normalised Shannon entropy —
+0 means every trace made the same move, 1 means they all differ. Finally the most
+divergent step goes to **repair**.
 
 ## The example
 
@@ -42,13 +38,13 @@ alone, and it is what a guardrail actually needs.
 ```
 1. [procedure]   Identify the core request…
 2. h=0.59  FORK  Identify the element: Ununoctium (Uun) is element 111
-       also read as: Ununoctium (Uuo) is element 118      ← correct
        also read as: Ununoctium (Uun) is element 112
 3-6. [procedure]
 ```
 
-One assertion in six steps, and it is the one carrying the error. The model had
-**118 available** as a minority reading and committed to 111 anyway.
+One assertion in six steps, and it is the one carrying the error — flagged without
+any reference to the true answer, purely because the model could not tell the same
+story twice.
 
 ## Three engineering decisions that made it work
 
@@ -179,16 +175,14 @@ not reach far enough to fix the answer at 2B.
 
 **Consistent false belief is out of scope.** If all seven traces make the *same*
 wrong move, entropy is zero and we call it stable. GlassBox measures whether a
-model is **inventing on the spot**, not whether it is **right**. Confabulation is
-unstable and shows up as spread; a memorised falsehood is stable and does not.
-Catching that needs retrieval against a source — a different tool, honestly
-labelled.
+model is **inventing on the spot**, not whether it is **right**. Catching a
+memorised falsehood needs retrieval against a source — a different tool.
 
 One more in the same spirit: our eval flagged *"boiling point of water in
 Celsius"* at 0.311 where we had labelled it answerable. Gemma had replied *"212
 degrees Celsius"* — the Fahrenheit figure. The detector was right and our label
-was wrong. We left the label alone. Relabelling after seeing the score is how you
-manufacture a number that does not survive contact with a judge.
+was wrong. We left the label alone; relabelling after seeing the score manufactures
+a number that will not survive a judge.
 
 ## Why this needs open weights
 
@@ -196,26 +190,18 @@ Three hard requirements, none available through an API:
 
 1. **Logit access.** The judge reads token probabilities directly. Without it the
    project does not function — the sampled token is dominated by a YES prior.
-2. **Per-call seeds.** Seven independent-but-reproducible traces, so results are
-   cacheable and every number here is reproducible *on a given machine*. Merging
-   caches from two machines showed 5 of 1630 entries disagreeing — llama.cpp
-   generation is not bit-identical across different CPUs, so a borderline step can
-   land either side of a threshold. Worth stating rather than claiming determinism
-   we do not have.
-3. **Trace-prefix continuation.** Repair restarts generation from a hand-edited
-   reasoning prefix. No chat endpoint lets you rewrite the model's own thought and
-   resume from it.
+2. **Per-call seeds**, so seven independent traces are reproducible and cacheable.
+   *On one machine*: merging two machines' caches showed 5 of 1630 entries
+   disagreeing, because llama.cpp generation is not bit-identical across CPUs.
+3. **Trace-prefix continuation.** Repair resumes generation from a hand-edited
+   reasoning prefix. No chat endpoint lets you rewrite the model's own thought.
 
 It runs offline on a CPU laptop: no server, no API key, no network once the GGUF
 is on disk. One 2.9 GB model is both the reasoner and its own judge.
 
 ## Try it
 
-```bash
-python glassbox.py test         # offline self-check of the maths
-python glassbox.py judgecheck   # 12 labelled pairs, expect 12/12
-python show.py "What is the atomic radius of ununoctium in picometres?"
-python glassbox.py serve        # http://127.0.0.1:8000
-```
+`python glassbox.py serve`, or run `demo.ipynb`, which replays the full pipeline
+from the committed cache in seconds without downloading the model.
 
 Code: https://github.com/AviDhandhania/glassbox
