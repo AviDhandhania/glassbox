@@ -101,6 +101,25 @@ def _llm(path=None):
     return _models[path]
 
 
+def _save():
+    """Persist the cache, merging with what is on disk first.
+
+    _cache is a snapshot taken at import, so a plain overwrite silently drops
+    every entry that appeared since - another process's, or a git pull's. A
+    long-running `serve` re-dropped 274 pulled entries on each write until this
+    existed. Re-read, union, write. Caller must already hold _cache_lock.
+
+    ponytail: re-reads the whole file per write (~1.5MB, tens of ms). Fine while
+    writes follow a multi-second generation; switch to append-only JSONL if the
+    cache ever gets written in a tight loop.
+    """
+    if CACHE_PATH.exists():
+        disk = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+        disk.update(_cache)  # ours wins on a tie
+        _cache.update(disk)  # and this process sees the union from here on
+    CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+
+
 def _gen(prompt, seed, temperature, max_tokens=MAX_TOKENS):
     """One completion. Cached on disk by (seed, temp, max_tokens, prompt).
 
@@ -126,7 +145,7 @@ def _gen(prompt, seed, temperature, max_tokens=MAX_TOKENS):
 
     with _cache_lock:
         _cache[key] = text
-        CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+        _save()
     return text
 
 
@@ -228,7 +247,7 @@ def p_yes(prompt):
 
     with _cache_lock:
         _cache[key] = p
-        CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+        _save()
     return p
 
 
@@ -502,7 +521,7 @@ def think(question, seed, temperature, max_tokens=THINK_TOKENS):
 
     with _cache_lock:
         _cache[key] = text
-        CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+        _save()
     return text
 
 
@@ -753,7 +772,7 @@ def repair(question, insp):
             _last_toks.pop(id(llm), None)
         with _cache_lock:
             _cache[key] = cached
-            CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+            _save()
 
     _, answer = parse_trace(body + cached)
     return {
@@ -816,6 +835,7 @@ def judgecheck():
 
 def demo():
     """Offline self-check: the maths and the parsing, no model needed."""
+    global CACHE_PATH, _cache
     close = lambda a, b: math.isclose(a, b, abs_tol=1e-9)
     assert close(entropy([[0, 1, 2, 3, 4]], 5), 0.0), "unanimous samples must score 0"
     assert math.copysign(1, entropy([[0, 1, 2, 3, 4]], 5)) > 0, "must be +0.0, not -0.0"
@@ -832,7 +852,25 @@ def demo():
     assert all(spans[i][1] <= spans[i + 1][0] for i in range(len(spans) - 1)), "spans must not overlap"
 
     assert verdict(0.0) == "grounded" and verdict(1.0) == "likely confabulated"
-    print("ok - entropy, clause offsets and verdicts all check out")
+
+    # _save must merge with the file, not overwrite it. A long-running serve held a
+    # pre-pull snapshot and silently re-dropped 274 pulled entries on every write.
+    import tempfile
+
+    real_path, real_cache = CACHE_PATH, _cache
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            CACHE_PATH = pathlib.Path(d) / "c.json"
+            CACHE_PATH.write_text(json.dumps({"theirs": 1, "shared": "disk"}), encoding="utf-8")
+            _cache = {"ours": 2, "shared": "mine"}
+            _save()
+            back = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+            assert back == {"theirs": 1, "ours": 2, "shared": "mine"}, f"_save lost entries: {back}"
+            assert _cache["theirs"] == 1, "_save must also refresh this process's view"
+    finally:
+        CACHE_PATH, _cache = real_path, real_cache
+
+    print("ok - entropy, clause offsets, verdicts and cache merge all check out")
 
 
 if __name__ == "__main__":
