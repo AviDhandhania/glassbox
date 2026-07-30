@@ -302,7 +302,12 @@
     go.textContent = "Analyse";
   }
   go.onclick = analyse;
-  q.onkeydown = (e) => e.key === "Enter" && analyse();
+  // Braces matter here. `(e) => e.key === "Enter" && analyse()` returns false for
+  // every other key, and returning false from a DOM0 handler cancels the event -
+  // which silently swallowed every keystroke and made the field untypeable.
+  q.onkeydown = (e) => {
+    if (e.key === "Enter") analyse();
+  };
 
   function stepRow(s, r) {
     const isFork = s.index === r.fork;
