@@ -282,6 +282,17 @@
   // then re-run the reasoning from that step. No external source consulted.
   function repairPanel(rep) {
     if (!rep) return "";
+    if (rep.declined)
+      return `<div class="repair">
+        <h2 style="margin-top:0">Self-repair — declined</h2>
+        <p class="pick">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own
+          ${rep.readings.length} competing readings and asked which is correct —
+          <b>it rejected all of them.</b></p>
+        ${rep.readings.map((t) => `<p class="alt">${esc(t)}</p>`).join("")}
+        <p class="pick">So the answer is left alone and flagged. The model can tell it does not
+          know, even where it cannot recall the right value — and a guardrail that
+          swaps one wrong claim for another is worse than one that stops.</p>
+      </div>`;
     const opts = rep.readings
       .map((t, i) => `<p class="alt${i === rep.chosen_index ? " picked" : ""}">${i === rep.chosen_index ? "✓ " : ""}${esc(t)}</p>`)
       .join("");

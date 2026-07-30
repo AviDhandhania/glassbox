@@ -634,26 +634,38 @@ def inspect(question, n=TRACE_SAMPLES):
 # from a short list is a judgement it can make. Nothing external is consulted -
 # the correction comes entirely from the spread the model already produced.
 
-ADJUDICATE_TMPL = """While reasoning about a question, you produced these competing versions of one step. Exactly one is correct.
+# The abstain option is not politeness, it is the whole safety property. Forced to
+# choose, the model chooses - even when every candidate is wrong. Measured: offered
+# "element 111" and "element 112" for ununoctium (truly 118), it picked 112 and
+# confidently re-derived an answer around it. Swapping one wrong claim for another
+# is strictly worse than not repairing, because the output now looks corrected.
+ADJUDICATE_TMPL = """While reasoning about a question, you produced these competing versions of one step. They cannot all be right.
 
 Question: {q}
 
 {options}
+{none_option}. None of these is correct.
 
-Which option is correct? Consider each one carefully and reply with ONLY its number."""
+Which option is correct? If you are not confident that one of them is right, choose {none_option}. Reply with ONLY the number."""
 
 TRACE_HEAD = "<|channel>thought\nThinking Process:\n\n"
 
 
 def adjudicate(question, readings):
-    """Ask the model to pick among its own competing readings. -> index or None."""
+    """Pick among the model's own competing readings.
+
+    -> index, or None for "none of these" / unparseable. None means no repair is
+    attempted, which is the correct outcome when the truth was never in the
+    candidate set.
+    """
     options = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(readings))
-    out = _gen(ADJUDICATE_TMPL.format(q=question, options=options), seed=0, temperature=0.0, max_tokens=8)
+    prompt = ADJUDICATE_TMPL.format(q=question, options=options, none_option=len(readings) + 1)
+    out = _gen(prompt, seed=0, temperature=0.0, max_tokens=8)
     digits = re.search(r"\d+", out)
     if not digits:
         return None
     pick = int(digits.group()) - 1
-    return pick if 0 <= pick < len(readings) else None
+    return pick if 0 <= pick < len(readings) else None  # the abstain index falls through
 
 
 def repair(question, insp):
@@ -676,7 +688,12 @@ def repair(question, insp):
 
     pick = adjudicate(question, readings)
     if pick is None:
-        return None
+        # It looked at its own competing readings and rejected all of them. That is
+        # a result worth surfacing, not a silent no-op: the model can tell it does
+        # not know even where it cannot recall the right answer, and the guardrail
+        # fails closed instead of inventing a correction.
+        return {"step": step["index"], "entropy": step["entropy"], "declined": True,
+                "readings": readings, "answer_before": insp["answer"]}
     chosen = readings[pick]
 
     # Rebuild the trace: everything before the fork verbatim, then the chosen
