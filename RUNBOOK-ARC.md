@@ -120,7 +120,7 @@ reduce confabulation?** Nobody at this hackathon will have measured it.
 
 Report the `SLIDE:` line it prints at the end.
 
-## Job 4 — warm the demo presets
+## Job 5 — warm the demo presets ⚠️ this one gates the Kaggle submission
 
 ```bash
 python show.py "What is the atomic radius of ununoctium in picometres?"
@@ -129,13 +129,30 @@ python show.py "Why did Nikola Tesla decline his 1917 Nobel Prize in Chemistry?"
 python show.py "In which year did Ronald Fisher publish his first paper on the Behrens-Fisher problem?"
 ```
 
-These are the four chips in the UI. Running them writes their results into
-`cache.json`, so **commit the cache afterwards** — that is what makes the live
-demo instant instead of 3 minutes of dead air on stage.
+These are the four chips in the UI **and** the cells in `demo.ipynb`, which is the
+"live demo" attached to the Kaggle writeup.
+
+Cache entries are keyed by exact prompt text, so the prompt edits made while you
+were setting up invalidated the older ones. The notebook claims it runs with no
+model download — that claim is only true once these have been re-run against the
+current code. Verify it rather than trusting it:
 
 ```bash
-git add -A && git commit -m "arc: warm demo cache + trace results" && git push
+python cachecheck.py
 ```
+
+It fakes the weights away, so a cache miss fails there instead of in front of a
+judge. It must print **"all presets replay from cache with no weights"**. If it
+lists misses, run the `show.py` lines it prints and check again.
+
+Then commit — this is what makes the stage demo instant instead of three minutes
+of dead air, and what makes the notebook work for judges:
+
+```bash
+python cachecheck.py && git add -A && git commit -m "warm demo cache, trace and ablation results" && git push
+```
+
+(Remember the commit rule at the top — no AI co-author trailer.)
 
 ## Job 5 — only if there is time
 
