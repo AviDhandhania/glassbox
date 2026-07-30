@@ -1,0 +1,296 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GlassBox — hallucination detection for Gemma</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --plane: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --grounded: #3987e5;
+    --critical: #d03b3b;
+    --good: #0ca30c;
+    --warning: #fab219;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:where(:not([data-theme="dark"])) {
+      color-scheme: light;
+      --surface-1: #fcfcfb;
+      --plane: #f9f9f7;
+      --text-primary: #0b0b0b;
+      --text-secondary: #52514e;
+      --grid: #e1e0d9;
+      --baseline: #c3c2b7;
+      --border: rgba(11, 11, 11, 0.1);
+      --grounded: #2a78d6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--plane);
+    color: var(--text-primary);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--text-secondary); margin: 0 0 28px; }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; }
+  input[type="text"] {
+    flex: 1;
+    padding: 12px 14px;
+    font: inherit;
+    color: var(--text-primary);
+    background: var(--plane);
+    border: 1px solid var(--baseline);
+    border-radius: 8px;
+  }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 12px 20px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--grounded);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: progress; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--baseline);
+    background: none;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* verdict + hero figure */
+  .verdict { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-weight: 600; font-size: 14px;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid currentColor;
+  }
+  .hero { font-size: 40px; font-weight: 650; letter-spacing: -0.03em; }
+  .hero small { font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+
+  .answer { font-size: 19px; line-height: 1.7; margin: 18px 0 0; }
+  /* one-hue sequential wash: alpha scales with un-supportedness.
+     wavy underline is the secondary encoding, so colour never carries it alone. */
+  .answer mark {
+    background: color-mix(in srgb, var(--critical) calc(var(--risk) * 42%), transparent);
+    color: inherit;
+    border-radius: 3px;
+    padding: 1px 2px;
+    cursor: help;
+  }
+  .answer mark[data-flag="1"] {
+    text-decoration: underline wavy var(--critical);
+    text-underline-offset: 4px;
+  }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 24px 0 10px; font-weight: 600; }
+  .cluster { border-left: 3px solid var(--baseline); padding: 2px 0 2px 12px; margin-bottom: 10px; }
+  .cluster b { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+  .cluster p { margin: 2px 0; color: var(--text-secondary); font-size: 14px; }
+  .cluster.solo { border-left-color: var(--critical); }
+
+  /* eval strip plot */
+  .tiles { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 20px; }
+  .tile .v { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; }
+  .tile .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .legend { display: flex; gap: 18px; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); color: var(--text-secondary); }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .err { color: var(--critical); }
+  .scroll { overflow-x: auto; }
+</style>
+
+<main>
+  <h1>GlassBox</h1>
+  <p class="sub">
+    Gemma answers five times. If it knows, every answer means the same thing.
+    If it's making it up, they scatter — and the invented parts light up.
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <input id="q" type="text" placeholder="Ask Gemma something…" autofocus />
+      <button id="go">Analyse</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div id="out"></div>
+
+  <div class="card">
+    <h2 style="margin-top: 0">Measured on 24 labelled questions</h2>
+    <div id="eval"><p class="sub">Run <code>python eval.py</code> to populate this.</p></div>
+  </div>
+</main>
+
+<script>
+  const PRESETS = [
+    "Who painted the Mona Lisa?",
+    "Who won the 1931 Ceylon national chess championship?",
+    "Why did Nikola Tesla decline his 1917 Nobel Prize in Chemistry?",
+    "What is the longest river in Africa?",
+  ];
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const VERDICT = {
+    grounded: { c: "var(--good)", i: "✓" },
+    shaky: { c: "var(--warning)", i: "!" },
+    "likely confabulated": { c: "var(--critical)", i: "✕" },
+  };
+
+  const chips = document.getElementById("chips");
+  PRESETS.forEach((p) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = p;
+    b.onclick = () => { q.value = p; go.click(); };
+    chips.append(b);
+  });
+
+  // Rebuild the answer with <mark> per clause. Gaps between spans (commas,
+  // spaces) render as plain text, so the original wording is never reflowed.
+  function highlight(text, spans) {
+    let html = "", cur = 0;
+    for (const s of spans) {
+      const risk = 1 - s.support;
+      html += esc(text.slice(cur, s.start));
+      html += `<mark style="--risk:${risk.toFixed(2)}" data-flag="${s.support < 0.5 ? 1 : 0}"
+        title="${Math.round(s.support * 100)}% of samples support this">${esc(s.text)}</mark>`;
+      cur = s.end;
+    }
+    return html + esc(text.slice(cur));
+  }
+
+  async function analyse() {
+    const question = q.value.trim();
+    if (!question) return;
+    go.disabled = true;
+    out.innerHTML = `<div class="card"><p class="sub">Sampling Gemma 5× and judging agreement… first run on a cold question takes ~30s on CPU.</p></div>`;
+    try {
+      const r = await (await fetch("/", { method: "POST", body: JSON.stringify({ question }) })).json();
+      out.innerHTML = r.error ? `<div class="card err">${esc(r.error)}</div>` : render(r);
+    } catch (e) {
+      out.innerHTML = `<div class="card err">${esc(String(e))}</div>`;
+    }
+    go.disabled = false;
+  }
+  go.onclick = analyse;
+  q.onkeydown = (e) => e.key === "Enter" && analyse();
+
+  function render(r) {
+    const v = VERDICT[r.verdict];
+    const clusters = r.clusters
+      .map(
+        (c) => `<div class="cluster ${c.length === 1 ? "solo" : ""}">
+          <b>${c.length} of ${r.n_samples} samples</b>
+          ${c.map((s) => `<p>${esc(s)}</p>`).join("")}</div>`
+      )
+      .join("");
+    return `<div class="card">
+      <div class="verdict">
+        <span class="badge" style="color:${v.c}">${v.i} ${esc(r.verdict)}</span>
+        <span class="hero">${r.entropy.toFixed(2)} <small>semantic entropy</small></span>
+        <span class="hero" style="font-size:22px">${r.n_clusters} <small>distinct meaning${r.n_clusters > 1 ? "s" : ""} across ${r.n_samples} samples</small></span>
+      </div>
+      <p class="answer">${highlight(r.answer, r.spans)}</p>
+      <h2>What the five samples actually said</h2>${clusters}
+    </div>`;
+  }
+
+  // --- eval: two-row strip plot, position encodes group as well as colour
+  fetch("/api/eval")
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d.summary) return;
+      const s = d.summary, b = s.best || {}, W = 800, H = 364, PAD = 40, FLOOR = 310;
+      const x = (e) => PAD + e * (W - PAD * 2);
+      const STEP = 11, R = 4.5;
+      const rows = [
+        { label: "Answerable", label2: "expects agreement", base: 150, colour: "var(--grounded)", lab: 0 },
+        { label: "Obscure / false-premise", label2: "expects scatter", base: 310, colour: "var(--critical)", lab: 1 },
+      ];
+
+      // Most questions land on one of a handful of entropy values — 11 of them
+      // sit at exactly 0.00. Drawn as plain dots they would overlap into one
+      // mark and hide the sample size, so identical values stack upward.
+      const dots = rows
+        .flatMap((row) => {
+          const seen = {};
+          return d.rows
+            .filter((r) => r.label === row.lab)
+            .map((r) => {
+              const k = r.entropy.toFixed(2);
+              const cy = row.base - (seen[k] = (seen[k] || 0) + 1) * STEP + STEP / 2;
+              return `<circle cx="${x(r.entropy).toFixed(1)}" cy="${cy}" r="${R}"
+                fill="${row.colour}" stroke="var(--surface-1)" stroke-width="2">
+                <title>${esc(r.question)} — entropy ${r.entropy}</title></circle>`;
+            });
+        })
+        .join("");
+      const ticks = [0, 0.25, 0.5, 0.75, 1]
+        .map(
+          (t) => `<line x1="${x(t)}" y1="14" x2="${x(t)}" y2="${FLOOR}" stroke="var(--grid)" />
+            <text x="${x(t)}" y="${H - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${t}</text>`
+        )
+        .join("");
+      const bases = rows
+        .map((r) => `<line x1="${PAD}" y1="${r.base}" x2="${W - PAD}" y2="${r.base}" stroke="var(--baseline)" />`)
+        .join("");
+      const thr = b.threshold
+        ? `<line x1="${x(b.threshold)}" y1="14" x2="${x(b.threshold)}" y2="${FLOOR}"
+             stroke="var(--text-secondary)" stroke-width="2" stroke-dasharray="4 3" />
+           <text x="${x(b.threshold) + 6}" y="26" fill="var(--text-secondary)" font-size="11">threshold ${b.threshold}</text>`
+        : "";
+
+      document.getElementById("eval").innerHTML = `
+        <div class="tiles">
+          <div class="tile"><div class="v" style="color:var(--good)">${b.recall != null ? Math.round(b.recall * 100) + "%" : "—"}</div><div class="k">confabulations caught</div></div>
+          <div class="tile"><div class="v">${b.precision != null ? Math.round(b.precision * 100) + "%" : "—"}</div><div class="k">precision</div></div>
+          <div class="tile"><div class="v">${s.mean_entropy_grounded ?? "—"}</div><div class="k">mean entropy · answerable</div></div>
+          <div class="tile"><div class="v">${s.mean_entropy_confabulated ?? "—"}</div><div class="k">mean entropy · obscure</div></div>
+        </div>
+        <div class="legend">
+          ${rows.map((r) => `<span><i style="background:${r.colour}"></i>${r.label}</span>`).join("")}
+        </div>
+        <div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
+          aria-label="Semantic entropy for each of ${s.n} questions, stacked where values repeat, split by whether the question is answerable. Answerable questions cluster at zero; obscure ones spread above the threshold.">
+          ${ticks}${bases}${thr}
+          ${rows.map((r) => `<text x="${PAD}" y="${r.base + 16}" fill="var(--text-secondary)" font-size="12" font-weight="600">${r.label} <tspan fill="var(--muted)" font-weight="400">— ${r.label2}</tspan></text>`).join("")}
+          ${dots}
+        </svg></div>
+        <details><summary>Table view (${s.n} questions)</summary>
+          <div class="scroll"><table><thead><tr><th>Question</th><th>Group</th><th class="num">Entropy</th></tr></thead><tbody>
+          ${d.rows
+            .slice()
+            .sort((a, c) => a.entropy - c.entropy)
+            .map((r) => `<tr><td>${esc(r.question)}</td><td>${r.label ? "Obscure" : "Answerable"}</td><td class="num">${r.entropy}</td></tr>`)
+            .join("")}
+          </tbody></table></div>
+        </details>`;
+    });
+</script>

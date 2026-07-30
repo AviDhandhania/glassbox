@@ -1,0 +1,7 @@
+# GGUF weights - gigabytes, and re-downloadable via the README
+models/
+
+# derived at runtime
+cache.json
+__pycache__/
+*.pyc
