@@ -199,7 +199,7 @@
 
   <div class="card">
     <div class="ask">
-      <input id="q" type="text" placeholder="Ask Gemma something…" autofocus />
+      <input id="q" type="text" placeholder="Ask Gemma anything — new questions take 3–5 min on CPU" autofocus />
       <button id="go">Analyse</button>
     </div>
     <div class="chips" id="chips"></div>
@@ -247,20 +247,59 @@
     chips.append(b);
   });
 
+  // A new question runs seven full reasoning traces, which is minutes on CPU.
+  // Without a running clock the page looks frozen and people assume it is broken -
+  // so show elapsed time and say up front roughly how long it takes.
+  const STAGES = [
+    [0, "Loading the model and starting the first reasoning trace…"],
+    [25, "Reasoning — trace 2 of 7…"],
+    [55, "Reasoning — trace 3 of 7…"],
+    [85, "Reasoning — trace 4 of 7…"],
+    [115, "Reasoning — trace 5 of 7…"],
+    [145, "Reasoning — trace 6 of 7…"],
+    [175, "Reasoning — trace 7 of 7…"],
+    [205, "Aligning steps across traces and reading judge logits…"],
+    [260, "Still going — long reasoning traces on this question…"],
+  ];
+
+  let timer = null;
+  function startWaiting() {
+    const t0 = Date.now();
+    const tick = () => {
+      const s = Math.round((Date.now() - t0) / 1000);
+      const stage = STAGES.filter(([at]) => s >= at).pop()[1];
+      out.innerHTML = `<div class="card">
+        <p><span class="spinner"></span>&nbsp;<strong>${esc(stage)}</strong></p>
+        <p class="muted" style="margin-top:8px">${s}s elapsed —
+          a question that isn't cached takes roughly 3–5 minutes on CPU, because it
+          runs seven full reasoning traces. The four presets are cached and instant.</p>
+      </div>`;
+    };
+    tick();
+    timer = setInterval(tick, 1000);
+  }
+  function stopWaiting() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
   async function analyse() {
     const question = q.value.trim();
     if (!question) return;
     go.disabled = true;
-    out.innerHTML = `<div class="card"><p class="muted"><span class="spinner"></span>
-      &nbsp;Reasoning seven times, aligning the traces, adjudicating any fork…
-      a cold question takes several minutes on CPU. The presets are cached and instant.</p></div>`;
+    go.textContent = "Working…";
+    startWaiting();
     try {
       const r = await (await fetch("/", { method: "POST", body: JSON.stringify({ question }) })).json();
+      stopWaiting();
       out.innerHTML = r.error ? `<div class="card err">${esc(r.error)}</div>` : render(r);
     } catch (e) {
-      out.innerHTML = `<div class="card err">${esc(String(e))}</div>`;
+      stopWaiting();
+      out.innerHTML = `<div class="card err">${esc(String(e))}<br /><span class="muted">
+        If the server is still running, it is probably still generating — check the terminal.</span></div>`;
     }
     go.disabled = false;
+    go.textContent = "Analyse";
   }
   go.onclick = analyse;
   q.onkeydown = (e) => e.key === "Enter" && analyse();
