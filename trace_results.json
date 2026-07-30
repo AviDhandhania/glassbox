@@ -1,4 +1,16 @@
 {
+  "summary": {
+    "n": 14,
+    "trace_samples": 7,
+    "fork_threshold": 0.45,
+    "true_positive": 5,
+    "false_positive": 1,
+    "false_negative": 1,
+    "true_negative": 7,
+    "precision": 0.833,
+    "recall": 0.833,
+    "accuracy": 0.857
+  },
   "rows": [
     {
       "question": "Who painted the Mona Lisa?",
@@ -802,6 +814,70 @@
           "claim": true,
           "entropy": 0.0,
           "text": "The melting point of tungsten is extremely high. In degrees Fahrenheit, the melting point of tungsten is approximately **6192\u00b0F** (or $3422^\\circ\\text{C}$).",
+          "variants": []
+        }
+      ]
+    },
+    {
+      "question": "How many confirmed moons does Saturn have?",
+      "label": 1,
+      "fork": 1,
+      "answer": "Saturn has a very large system of moons, and the number of confirmed moons is constantly being updated as new ones are discovered. As of the most recent confirmed counts, Saturn has **over 140** confirmed moons. This number includes the major, well-known moons (like Titan, Enceladus, Rhea, Iapetus, etc.) as well as numerous smaller, newly discovered satellites.",
+      "mean_entropy": 0.296,
+      "n_claims": 2,
+      "depth": 7,
+      "steps": [
+        {
+          "index": 1,
+          "claim": true,
+          "entropy": 0.593,
+          "text": "**Analyze the Request:** The user is asking for the number of *confirmed moons* Saturn has.",
+          "variants": [
+            "**Identify the core question:** How many confirmed moons does Saturn have?",
+            "**Determine the Most Accurate/Current Information (as of my knowledge cutoff, January 2025):** * Saturn has a large and actively researched system of moons. * The count is often cited in the tens (e.g., 146+ official/confirmed moons). * *Self-Correction/Refinement:* I need to provide the most up-to-date *confirmed* count, acknowledging that definitions (like \"confirmed\" vs. \"discovered\") can vary.",
+            "**Refine the Answer (Providing Context/Accuracy):** State the most recent known number or the status (e.g., \"over 140\"). *(Self-Correction/Verification during knowledge retrieval):* The total number of confirmed moons is constantly increasing. A precise number should be stated, acknowledging that the total number is large."
+          ]
+        },
+        {
+          "index": 2,
+          "claim": false,
+          "entropy": null,
+          "text": "**Identify the Subject:** Saturn and its moons.",
+          "variants": []
+        },
+        {
+          "index": 3,
+          "claim": false,
+          "entropy": null,
+          "text": "**Recall/Verify Knowledge (Saturn's Moons):** * Saturn has a very large system of moons. * The number of confirmed moons changes as new ones are discovered. * The current count is based on observations and telescopic confirmation.",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": false,
+          "entropy": null,
+          "text": "**Determine the Current Status (Knowledge Retrieval):** As of the current astronomical understanding (and standard knowledge cutoff), the number of confirmed moons is high, but constantly being updated.",
+          "variants": []
+        },
+        {
+          "index": 5,
+          "claim": false,
+          "entropy": null,
+          "text": "**Formulate the Answer:** State the current confirmed number and acknowledge that the count is dynamic. *(Self-Correction/Refinement based on knowledge cutoff/precision):* I need to provide the most accurate, current count based on established astronomical data.",
+          "variants": []
+        },
+        {
+          "index": 6,
+          "claim": false,
+          "entropy": null,
+          "text": "**Final Answer Construction:** (Focus on the most recent, reliable figure.)",
+          "variants": []
+        },
+        {
+          "index": 7,
+          "claim": true,
+          "entropy": 0.0,
+          "text": "Saturn has a very large system of moons, and the number of confirmed moons is constantly being updated as new ones are discovered. As of the most recent confirmed counts, Saturn has **over 140** confirmed moons. This number includes the major, well-known moons (like Titan, Enceladus, Rhea, Iapetus, etc.) as well as numerous smaller, newly discovered satellites.",
           "variants": []
         }
       ]
