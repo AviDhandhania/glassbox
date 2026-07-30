@@ -2,249 +2,180 @@
 
 **Track: AI Shield** · 3 minutes + Q&A
 
-Before you start: browser at `http://127.0.0.1:8000`, four preset chips visible,
-`python glassbox.py serve` already running. **Turn the wifi off.** Do it visibly —
-it costs three seconds and it proves the whole edge story without a sentence of
-explanation.
+Before you start: browser open at `http://127.0.0.1:8000`, the four preset
+buttons visible, server already running. **Turn the wifi off** — do it where
+people can see. It takes three seconds and proves the whole story without
+explaining anything.
 
 ---
 
 ## 0:00 — The hook (20s)
 
-> "When a model doesn't know something, it doesn't tell you. It makes something up
-> in exactly the same confident voice it uses for things it knows.
+> "When a model doesn't know something, it doesn't say so. It makes something up,
+> in exactly the same confident voice it uses when it's right.
 >
-> A 2026 audit of deployed medical GPTs found 25 to 30 percent had low factual
-> accuracy. Those systems sound identical whether they're right or inventing.
+> We don't try to tell you whether the answer is right. We tell you whether the
+> model is **guessing** — and which step it started guessing on."
+
+## 0:20 — Demo 1: it knows this (20s)
+
+Click **"Who painted the Mona Lisa?"** — instant, it's already cached.
+
+> "Gemma thinks out loud before it answers. We made it think seven separate
+> times, then lined the seven up side by side.
 >
-> We don't try to tell you whether Gemma is *right*. We tell you whether it's
-> **making it up right now** — and exactly which step it started on."
-
-## 0:20 — Demo part 1: it knows this (20s)
-
-Click **"Who painted the Mona Lisa?"** — instant, it's cached.
-
-> "Gemma 4 reasons out loud before answering. We made it reason seven separate
-> times. Six of these steps are just procedure — 'I'll check my knowledge base' —
-> and we don't score those, because only a claim can be wrong.
+> Most of these steps are just planning — 'I'll check what I know.' We ignore
+> those. Only a real claim can be wrong.
 >
-> One real assertion: 'the artist is Leonardo da Vinci.' Entropy zero. All seven
-> runs agree. It knows this cold."
+> Here's the one real claim: 'the artist is Leonardo da Vinci.' All seven runs
+> said the same thing. It knows this cold."
 
-## 0:40 — Demo part 2: the catch (40s)
+## 0:40 — Demo 2: the catch (40s)
 
 Click **"What is the atomic radius of ununoctium?"**
 
-> "Same confident voice. And it's wrong — it says element 111. Ununoctium is 118.
+> "Same confident voice. But this time it's wrong — it says element 111.
+> Ununoctium is 118.
 >
-> But look where it lights up. **Step 2.** Not 'the answer is bad' — *this step,
-> right here, is where it started guessing.* Across seven traces it said 111, 112,
-> and 118.
+> Now look where the screen lights up. **Step 2.** Not 'the answer looks bad' —
+> *this exact step is where it started guessing.* Across the seven runs it said
+> 111 here, and 112 there, and 118 somewhere else.
 >
-> And look at that." — point at 118 — "**The correct answer was already in there.**
-> It was a minority reading among its own attempts. The model had it and picked
-> wrong."
+> It couldn't keep its own story straight, and we can point at the line where it
+> came apart."
 
-Pause on that. It's the moment the room gets it.
+Pause here. This is the moment the room gets it.
 
-## 1:20 — Demo part 3: it fails closed (25s)
+## 1:20 — Demo 3: it knows when to stop (25s)
 
-**Measured position — say exactly this, no more:**
-
-> "So we hand it back its own two readings — 111 and 112 — and ask which is right,
-> with 'none of these' allowed.
+> "So we show it the versions it came up with itself and ask which one is right —
+> and we let it say 'none of these.'
 >
-> **It rejects both.** Correctly: the answer is 118, and 118 was never in its own
-> candidate set. So we flag it and stop.
+> **It says none of these.** And it's right to: the true answer, 118, wasn't in
+> the shortlist. So we flag the question and stop there.
 >
-> An earlier version *forced* a choice. It picked 112 and confidently rebuilt the
-> whole answer around it — one wrong claim swapped for another, and now it *looks*
-> corrected. That's worse than doing nothing. A guardrail has to fail closed."
+> That matters. A safety tool that invents a confident correction is worse than
+> one that says nothing. This one refuses to guess twice."
 
-**Do not claim repair fixes answers.** It never did, in 8 questions. Only one
-produced a clean factual adjudication, so there is no measurement — and the
-writeup says so. If asked "does it repair?":
+## 1:45 — The cost question (25s)
 
-> "No. We built it, measured it, and it doesn't — the true answer usually isn't in
-> the model's own candidate set, so there's nothing to pick. What it does reliably
-> is refuse to invent a fix. Zero false repairs."
+**Bring this up yourself, before anyone asks.**
 
-## 1:45 — The cost answer (25s)
-
-**Raise this yourself. Do not wait to be asked** — volunteering your most obvious
-weakness, with a solution attached, is worth more than surviving the question.
-
-> "Now — seven traces is seven times the generation. 4,487 tokens against 640 for
-> a single answer. We measured it, and it's real.
+> "Seven runs is seven times the work. That's real, and we measured it.
 >
-> So we implemented Semantic Entropy Probes — Kossen et al. — a linear probe on
-> the model's hidden state that predicts confabulation from **one forward pass**,
-> no sampling at all.
+> So we also built a shortcut. There's a small model on top that reads Gemma's
+> internal state and predicts 'this one's a guess' from **a single pass** — no
+> repeat runs at all.
 >
-> **AUROC 0.885 across 93 examples.** Twenty-one prefill tokens, zero generated —
-> about two hundred times cheaper. It ranks a confabulating answer above a
-> grounded one nearly nine times in ten.
+> **It gets that right nearly nine times in ten**, across 93 questions, for about
+> a two-hundredth of the cost.
 >
-> So the deployable shape is a cascade: screen everything at effectively no cost,
-> spend the seven traces only on what the probe flags."
+> So the real product is two-stage: the cheap check looks at everything, and the
+> seven runs only happen on what it flags. In practice that's about 2.4× the
+> work, not 7×. And it's running on your own laptop, so it costs time, not money."
 
-Quote **AUROC, not accuracy** — the set is 76% negative, so accuracy (83%) beats
-the majority baseline by only 7 points and is easy to wave away. AUROC is
-threshold-independent and immune to the imbalance.
+## 2:10 — The numbers (25s)
 
-If they ask what it costs in practice: **at a 20% flag rate the average is ~2.4×,
-not 7×** — and locally there is no per-token bill, so it is wall-clock, not spend.
+Scroll to the results panel.
 
-## 1:50 — The numbers (30s)
-
-Scroll to the eval panel.
-
-> "Everything is measured, not vibes.
+> "All of this is measured, not claimed.
 >
-> The judge scores 12 out of 12 on labelled pairs. Answer-level detection catches
-> 92 percent of confabulations at 100 percent precision across 24 questions.
+> The judge scores 12 out of 12 on labelled examples. On whole answers we catch
+> 92 percent of made-up ones, with no false alarms, across 24 questions. On
+> individual reasoning steps we find the right one 86 percent of the time.
 >
-> Every threshold comes from a sweep over labelled data and sits in the *middle*
-> of its winning range — our first tuner picked a cut-off nine thousandths above
-> real data and would have flipped on noise. We caught that because the tuner is
-> code, not a judgement call."
+> Every cutoff in the system was chosen by sweeping labelled data, not by
+> picking a number that felt right."
 
-## 2:20 — Why this needs Gemma (25s)
+## 2:35 — Why this needs an open model (15s)
 
-> "Three things here are impossible against an API.
+> "Three things here are impossible through an API.
 >
-> One — we never read the judge's words. A 2B model says YES to almost anything;
-> it told us 'Leonardo painted it' and 'Michelangelo painted it' were the same
-> claim. So we skip the text and read the raw YES/NO **logits** underneath. That
-> took us from 10 out of 12 to 12 out of 12, and it's *cheaper* — one forward
-> pass, zero tokens generated.
+> We read the judge's raw yes/no signal instead of its words — that took us from
+> 10 out of 12 to 12 out of 12, and it's cheaper, because nothing gets written.
+> We fix the random seed, so the seven runs are reproducible. And we can pick up
+> the model's own train of thought mid-sentence and continue it.
 >
-> Two — seeded sampling, so seven independent traces are reproducible.
->
-> Three — repair rewrites the model's own thought and resumes generation from it.
-> No chat endpoint lets you do that.
->
-> One 2.9 gigabyte model. It's the reasoner and its own judge. Laptop CPU, wifi
-> off, nothing leaves the machine — which is the only way this is deployable in a
-> clinic or a law office."
+> One 2.9 gigabyte model does all of it — it's the thinker and its own judge.
+> Laptop, wifi off, nothing leaves the room."
 
-## 2:45 — Close (15s)
+## 2:50 — Close (10s)
 
-> "Thinking mode already killed the easy hallucinations — Gemma 4 correctly refuses
-> false premises that Gemma 3 confabulated on. What survives is subtler: partial
-> knowledge on real entities, where it half-remembers and fills the gap.
+> "The obvious hallucinations are mostly gone. What's left is the subtle kind —
+> where the model half-remembers something real and fills in the rest.
 >
-> That's the dangerous kind, and that's what GlassBox catches."
+> That's the dangerous kind. That's what GlassBox catches."
 
 ---
 
-# Q&A — the five you will actually get
+# Q&A — the four you'll actually get
 
 ### "Isn't this just self-consistency?"
 
-Self-consistency samples N answers and takes the majority — it needs answers you
-can compare, and it gives you a vote, not a diagnosis. We do three things it
-doesn't: we compare by **meaning** using a logit-read judge so free-form text
-works; we operate on **reasoning steps**, so we localise *where* it broke rather
-than just flagging the output; and we keep the minority readings, which is what
-makes repair possible. Majority voting on ununoctium would have returned 111 —
-the wrong answer. Ours surfaced 118.
+Self-consistency samples a few answers and takes the majority vote. It needs
+answers you can line up and compare, and it gives you a vote, not a diagnosis.
+We compare by **meaning**, so free-form text works. We work on **reasoning
+steps**, so we can say where it broke rather than just flagging the output. And
+we keep the minority readings instead of throwing them away. A majority vote on
+ununoctium would have returned 111 — the wrong answer.
 
-### "Self-correction has been shown not to work."
+### "Hasn't self-correction been shown not to work?"
 
-Correct, and that's the right paper to cite —
-[Huang et al., ICLR 2024](https://arxiv.org/abs/2310.01798) showed **intrinsic**
-self-correction fails: ask a model to reflect on its own answer and performance
-often *degrades*.
+Yes — [Huang et al., ICLR 2024](https://arxiv.org/abs/2310.01798) showed that
+asking a model to reflect on its own answer often makes things worse.
 
-We never ask it to reflect. We don't say "are you sure?" We hand it a shortlist of
-readings **it generated itself** at temperature 0.9 and ask a recognition question.
-That's adjudication over self-generated evidence, not introspection. Whether it
-works at 2B is an empirical question and we measured it rather than assuming.
+We never ask it to reflect. We don't say "are you sure?" We hand it a shortlist
+it wrote itself and ask it to recognise the right one. That's a different
+question, and we measured it rather than assuming.
 
-### "What if the model is confidently wrong every single time?"
+### "Why not just use a bigger model, or look things up?"
 
-Then we miss it, and we say so up front. All seven traces agree, entropy is zero,
-we call it stable. GlassBox detects **invention**, not **error**. A memorised
-falsehood is stable; a confabulation is not. Catching the first kind needs
-retrieval against a real source — a different tool. We're complementary to RAG,
-not a replacement, and RAG needs a source to exist in the first place.
+Both need something you might not have. A bigger model still makes things up,
+just more smoothly. Looking things up needs a trusted source and a network
+connection. GlassBox needs neither — it works offline, on questions where
+there's no document to find. That's exactly the on-device case.
 
-### "Why not just use a bigger model, or RAG?"
+### "Seven runs is 7× the compute. Is that practical?"
 
-Both need something we may not have. A bigger model still hallucinates, just more
-fluently. RAG needs a trustworthy corpus and a network round-trip. GlassBox needs
-neither — it works offline on questions with no document to retrieve, which is
-exactly the on-device case. And it's *free* at the margin: local inference has no
-per-token cost, so seven traces costs time, not money.
+Concede it straight away, then give the numbers.
 
-### "Seven traces is 7× the compute. Is that practical?" ← have the numbers ready
-
-**Concede it immediately, then produce the measurement.** Do not get defensive;
-this is your strongest prepared answer.
-
-> "Seven times, and we measured it rather than hand-waving. On one question:
-> 4,487 generated tokens against roughly 640 for a single answer. That's the
-> honest cost — disagreement between samples *is* the measurement, so you cannot
-> get it from one sample.
+> "Seven times, and we measured it rather than hand-waving.
 >
-> Two things pull it back. The judging — 136 calls on that question — generates
-> **zero tokens**. It's all prefill, because we read logits instead of sampling
-> words, so the most accurate part is also the cheapest. And KV reuse across
-> judge calls took that from 55 seconds to 18.5.
+> Two things pull it back. The judging step generates **no text at all** — we
+> read the model's internal signal directly, so the most accurate part is also
+> the cheapest. And reusing work between judge calls took one question from 55
+> seconds to 18.5.
 >
-> But the real answer is the probe. **21 prefill tokens, zero generated, AUROC
-> 0.885.** About 200× cheaper than the full pipeline. So you screen every request
-> at effectively no cost and spend the seven traces only on what gets flagged —
-> if 20% flag, your average is 2.4×, not 7×.
->
-> And this runs locally. There's no per-token bill. 7× is wall-clock, not spend —
-> which is exactly why it belongs on-device rather than behind an API, where 7×
-> is a line item nobody approves."
-
-| | Generated | Prefill |
-|---|---|---|
-| One answer with thinking | ~640 | — |
-| GlassBox, 7 traces | 4,487 | — |
-| 136 judge calls | **0** | 25,160 |
-| **Probe screening** | **0** | **21** |
+> But the real answer is the shortcut model: one pass, right nearly nine times
+> in ten, about 200× cheaper. Screen everything with that, and only spend the
+> seven runs on what it flags."
 
 ---
 
-## Where this actually gets used
+## Where this gets used
 
-Name one concrete deployment, not a category:
+Name one real place, not a category:
 
 > "A rural clinic running an offline medical assistant on a laptop. No internet,
-> so no RAG and no API. Patient data legally can't leave the building. Today that
-> assistant has no way to signal when it's guessing about a drug interaction.
-> GlassBox is a drop-in gate: same model, no network, and it either answers,
-> warns, or refuses."
+> so nothing can be looked up. Patient records legally can't leave the building.
+> Today that assistant has no way to signal when it's guessing about a drug
+> interaction. GlassBox drops in as a gate: same model, no network — it either
+> answers, warns, or declines."
 
-That's the pitch for **why on-device hallucination detection is a distinct
-problem** — every cloud mitigation assumes a network and a corpus, and this
-setting has neither.
-
-## Numbers to have on the tip of your tongue
+## Numbers to have ready
 
 | | |
 |---|---|
-| Judge accuracy | 12/12 labelled pairs |
-| Answer-level detection | 92% recall, 100% precision, n=24 |
-| **Step-level localization** | **86% accuracy**, 83% precision/recall, n=14 |
-| **Single-pass probe** | **AUROC 0.885**, n=93 |
-| Self-repair | 0 corrections, **0 false repairs** — not measurable, see writeup |
-| Thinking mode ablation | 0% confabulation on *and* off — floor effect, no result |
-| Mean entropy, known vs obscure | 0.026 vs 0.674 |
-| Judge speedup from KV reuse | 55s → 18.5s (3×) |
-| Cost of detection | 4,487 generated tokens vs ~640 for one answer (**7×**) |
-| Cost of probe screening | **21 prefill, 0 generated** (~200× cheaper) |
-| Tokens generated by 136 judge calls | **zero** — logits, not sampling |
-| Model footprint | one 2.9 GB GGUF, reasoner + judge |
+| Judge accuracy | 12 out of 12 |
+| Whole-answer detection | 92% caught, no false alarms, n=24 |
+| **Step-level localisation** | **86% accuracy**, n=14 |
+| **Single-pass shortcut** | **right ~9 times in 10**, n=93 |
+| Known vs obscure questions | 0.026 vs 0.674 average spread |
+| Speedup from reusing judge work | 55s → 18.5s |
+| Model footprint | one 2.9 GB file — thinker and judge |
 | Network traffic during demo | zero |
 
-## Do not say
+## Wording
 
-- "It detects hallucinations" — say *confabulation*, and name the blind spot.
-- Any repair claim Arc hasn't confirmed.
-- "It's 100% accurate." Precision is 100% on our 24-question set. Say the set size.
+- Say **"making it up"** or **"guessing"** rather than "hallucinating."
+- Say the set size out loud whenever you quote a percentage.
