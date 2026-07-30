@@ -5,9 +5,19 @@
 Gemma 4 reasons out loud before it answers. Nobody reads those 4,000 tokens, so
 the reasoning is a black box wearing a glass coat.
 
-GlassBox makes Gemma 4 reason **five times**, aligns the traces step by step, and
+GlassBox makes Gemma 4 reason **seven times**, aligns the traces step by step, and
 measures where they stop agreeing. The result is not "this answer is shaky" — it
 is **"step 2 is where it started guessing, and here is what it guessed instead."**
+
+Then it goes one further. It hands the model its own competing readings and asks
+which is right, and re-runs the reasoning from that step. **Detection, then
+repair, from a single 2.9 GB model on a laptop CPU with the network off.**
+
+The bet behind repair: *recognition is easier than recall*. Free-recalling an
+element number is a lookup the model half-remembers. Picking the right option
+from a shortlist it generated itself is a judgement it may well get right. The
+correction never consults an external source — it comes entirely out of the
+spread the model already produced.
 
 ## The example that shows it working
 
@@ -42,6 +52,11 @@ That is the failure this tool exists to surface.
    normalised Shannon entropy over the clusters. 0 = all five made the same move,
    1 = five different moves.
 4. **The fork** is the first assertion step above threshold.
+5. **Repair.** Show the model the competing readings of the most divergent step,
+   let it adjudicate, rebuild the trace prefix with its choice, and continue
+   generating from there. Repair deliberately targets the most divergent step
+   rather than the flagged fork — the fork threshold is still untuned, and gating
+   repair on it would let a bad threshold silently switch the feature off.
 
 ### Why the claim filter matters
 
@@ -138,6 +153,12 @@ Fixed since first run — the Mona Lisa false positive turned out to be two bugs
 
 Open:
 
+- **Self-repair is written but unvalidated.** `repair()` and `repair_check.py`
+  have never been run against a real fork — the development machine's CPU could
+  not reach one in reasonable time. The UI panel for it was checked against a
+  synthetic fixture, so **the layout is real and the result is not**. Whether the
+  model actually rejects its own reading is [Job 3 on the Arc box](RUNBOOK-ARC.md).
+  Until that runs, no claim about repair belongs in the pitch.
 - **The fork threshold is untuned.** 0.45 is inherited from the answer-level
   detector. With few traces the entropy estimate is coarse and one sample can
   swing it across the line — ununoctium read 0.59 with 5 traces and 0.406 with 4.

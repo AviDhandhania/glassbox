@@ -3,6 +3,19 @@
 This machine owns **compute and results**. The other machine owns **code**.
 That split exists so the two never fight over the same files.
 
+> ### Commit rule — read before your first commit
+> **Do not add Claude, or any AI tool, as a co-author or collaborator.** No
+> `Co-Authored-By:` trailers, no "generated with" lines, no GitHub collaborator
+> invites. Every commit is authored solely by you. If your editor or CLI adds a
+> trailer automatically, strip it:
+>
+> ```bash
+> git commit --amend --no-edit    # after deleting the trailer line
+> ```
+>
+> Check before pushing: `git log -1 --format=%B` should contain no mention of
+> Claude, Copilot, or any assistant.
+
 - **You commit:** `cache.json`, `trace_results.json`, `eval_results.json`,
   `ablation_results.json`
 - **You do not edit:** `glassbox.py`, `index.html`, `show.py` — pull those
@@ -66,7 +79,36 @@ python traces.py --report
 It prints `set FORK = <x>` from a proper sweep. **Report that number** — it is
 the one value gating whether the fork calls in the demo are trustworthy.
 
-## Job 3 — the thinking on/off study
+## Job 3 — validate self-repair ⭐ this is the demo
+
+This is the newest code and the **least verified** — written on the other machine
+but never run against a real fork, because its CPU could not reach one in
+reasonable time. It is also the centrepiece of the pitch, so it needs to be real
+before anyone claims it on stage.
+
+```bash
+python repair_check.py
+```
+
+It inspects each question, finds the most divergent claim step, shows Gemma its
+own competing readings, asks it to pick, and re-runs the reasoning from there.
+
+**The specific thing we are testing:** whether *recognition beats recall*. Gemma
+free-recalls "ununoctium is element 111" (wrong — it is 118), but when handed
+111 / 112 / 118 as a multiple choice, can it pick 118? If yes, the model repairs
+its own hallucination with no external source, and that is the demo.
+
+Report for each question:
+- which reading it chose, and whether that differed from its original
+- the before/after answers
+- **whether the after-answer is actually correct** — this is a human judgement,
+  please eyeball it rather than trusting the tool
+
+If it mostly picks its original reading, say so plainly. A negative result is
+still a finding and belongs in the writeup — "recognition did not beat recall at
+2B" is honest and interesting. Do not let it be quietly dropped.
+
+## Job 4 — the thinking on/off study
 
 ```bash
 python -u ablate.py

@@ -124,6 +124,21 @@
   .step.fork { border-left: 3px solid var(--critical); padding-left: 11px; margin-left: -14px; background: color-mix(in srgb, var(--critical) 9%, transparent); }
   .step.fork .tag { color: var(--critical); font-weight: 700; letter-spacing: 0.04em; }
   .alt { margin: 5px 0 0; padding-left: 12px; border-left: 2px solid var(--baseline); color: var(--text-secondary); font-size: 13.5px; }
+  .alt.picked { border-left-color: var(--good); color: var(--text-primary); }
+
+  /* repair: before -> after */
+  .repair { margin-top: 22px; border-top: 1px solid var(--grid); padding-top: 18px; }
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 620px) { .ba { grid-template-columns: 1fr; } }
+  .ba > div { border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; }
+  .ba .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 7px; }
+  .ba .before { border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+  .ba .before .lbl { color: var(--critical); }
+  .ba .after { border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+  .ba .after .lbl { color: var(--good); }
+  .ba p { margin: 0; font-size: 14.5px; }
+  .pick { font-size: 13.5px; color: var(--text-secondary); margin: 10px 0 0; }
+  .pick b { color: var(--text-primary); }
   /* one-hue sequential ramp: width AND depth both track entropy */
   .bar { height: 4px; border-radius: 2px; background: var(--grid); margin-top: 6px; max-width: 260px; }
   .bar i { display: block; height: 100%; border-radius: 2px; background: var(--critical); }
@@ -145,9 +160,13 @@
 <main>
   <h1>GlassBox</h1>
   <p class="sub">
-    Gemma 4 reasons out loud before it answers. We make it reason five times and
-    compare the traces step by step — so instead of just knowing the answer is
-    shaky, you see <em>the exact step</em> where it started guessing.
+    Gemma 4 reasons out loud before it answers — thousands of tokens nobody reads.
+    We make it reason seven times, align the traces step by step, and find
+    <em>the exact step</em> where it started guessing. Then we hand it back its own
+    competing versions and let it fix itself.
+    <br /><span style="color: var(--muted); font-size: 13.5px">
+      One 2.9&nbsp;GB Gemma 4 E2B on a laptop CPU. No API, no network, no second model.
+    </span>
   </p>
 
   <div class="card">
@@ -207,7 +226,8 @@
     const question = q.value.trim();
     if (!question) return;
     go.disabled = true;
-    out.innerHTML = `<div class="card"><p class="sub">Sampling Gemma 5× and judging agreement… first run on a cold question takes ~30s on CPU.</p></div>`;
+    out.innerHTML = `<div class="card"><p class="sub">Reasoning seven times, aligning the traces, then adjudicating any fork…
+      a cold question runs several minutes on CPU. The four presets are cached and instant.</p></div>`;
     try {
       const r = await (await fetch("/", { method: "POST", body: JSON.stringify({ question }) })).json();
       out.innerHTML = r.error ? `<div class="card err">${esc(r.error)}</div>` : render(r);
@@ -249,6 +269,31 @@
       <p class="answer">${esc(r.answer)}</p>
       <h2>Inside the reasoning</h2>
       ${steps}
+      ${repairPanel(r.repair)}
+    </div>`;
+  }
+
+  // The payoff: hand the model its own competing readings, let it adjudicate,
+  // then re-run the reasoning from that step. No external source consulted.
+  function repairPanel(rep) {
+    if (!rep) return "";
+    const opts = rep.readings
+      .map((t, i) => `<p class="alt${i === rep.chosen_index ? " picked" : ""}">${i === rep.chosen_index ? "✓ " : ""}${esc(t)}</p>`)
+      .join("");
+    const changed = rep.answer_before.trim() !== rep.answer_after.trim();
+    return `<div class="repair">
+      <h2 style="margin-top:0">Self-repair — the model resolves its own fork</h2>
+      <p class="pick">Step <b>${rep.step}</b> diverged. Gemma 4 was shown its own ${rep.readings.length}
+        competing readings and asked which is correct — nothing external was consulted.</p>
+      ${opts}
+      <p class="pick">${rep.was_original
+          ? "It stood by its original reading, and the answer was re-derived from it."
+          : "<b>It rejected its own first answer</b> and re-reasoned from the option it picked."}</p>
+      <div class="ba">
+        <div class="before"><div class="lbl">Before</div><p>${esc(rep.answer_before)}</p></div>
+        <div class="after"><div class="lbl">After repair</div><p>${esc(rep.answer_after)}</p></div>
+      </div>
+      ${changed ? "" : '<p class="pick">The answer did not change.</p>'}
     </div>`;
   }
 

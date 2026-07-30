@@ -368,7 +368,12 @@ def serve(port=8000):
             if not q:
                 return self._json({"error": "no question"}, 400)
             try:
-                self._json(score(q) if body.get("mode") == "answer" else inspect(q))
+                if body.get("mode") == "answer":
+                    return self._json(score(q))
+                r = inspect(q)
+                if body.get("repair", True) and "error" not in r:
+                    r["repair"] = repair(q, r)
+                self._json(r)
             except Exception as e:  # surface backend errors in the UI, not the console
                 self._json({"error": str(e)}, 500)
 
@@ -570,6 +575,97 @@ def inspect(question, n=TRACE_SAMPLES):
         "n_claims": len(claims),
         # averaged over claim steps only - procedure steps carry no signal
         "mean_entropy": round(sum(s["entropy"] for s in claims) / len(claims), 3) if claims else 0.0,
+    }
+
+
+# ---------------------------------------------------------------- repair
+#
+# Detection is only half of a guardrail. Once the fork is located we hand the
+# model its OWN competing readings and ask it to adjudicate, then re-run the
+# reasoning from that point with the chosen step substituted in.
+#
+# The bet is that recognition is easier than recall: free-recalling an element
+# number is a lookup the model half-remembers, whereas picking the right option
+# from a short list is a judgement it can make. Nothing external is consulted -
+# the correction comes entirely from the spread the model already produced.
+
+ADJUDICATE_TMPL = """While reasoning about a question, you produced these competing versions of one step. Exactly one is correct.
+
+Question: {q}
+
+{options}
+
+Which option is correct? Consider each one carefully and reply with ONLY its number."""
+
+TRACE_HEAD = "<|channel>thought\nThinking Process:\n\n"
+
+
+def adjudicate(question, readings):
+    """Ask the model to pick among its own competing readings. -> index or None."""
+    options = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(readings))
+    out = _gen(ADJUDICATE_TMPL.format(q=question, options=options), seed=0, temperature=0.0, max_tokens=8)
+    digits = re.search(r"\d+", out)
+    if not digits:
+        return None
+    pick = int(digits.group()) - 1
+    return pick if 0 <= pick < len(readings) else None
+
+
+def repair(question, insp):
+    """Re-run the reasoning from the fork with the adjudicated step substituted.
+
+    Returns None when there is nothing to repair, so callers can treat "no fork"
+    and "fork resolved to the original reading" as the same non-event.
+    """
+    # Target the most divergent claim step, not strictly the flagged fork. FORK is
+    # still provisional, and gating repair on it means a mis-set threshold
+    # silently disables repair entirely. Wherever the traces disagree there is
+    # something to adjudicate, flagged or not.
+    candidates = [s for s in insp["steps"] if s["claim"] and s["variants"]]
+    if not candidates:
+        return None
+    step = max(candidates, key=lambda s: s["entropy"])
+    readings = [step["text"]] + step["variants"]
+
+    pick = adjudicate(question, readings)
+    if pick is None:
+        return None
+    chosen = readings[pick]
+
+    # Rebuild the trace: everything before the fork verbatim, then the chosen
+    # reading, then let the model carry on from there.
+    prefix = [s["text"] for s in insp["steps"] if s["index"] < step["index"]] + [chosen]
+    body = TRACE_HEAD + "".join(f"{i + 1}.  {s}\n" for i, s in enumerate(prefix))
+
+    with _model_lock:
+        llm = _llm()
+        seed_prompt = _prompt_for(
+            llm, [{"role": "system", "content": THINK}, {"role": "user", "content": question}]
+        )
+        key = f"repair|{MODEL_PATH.name}|{body}"
+        with _cache_lock:
+            cached = _cache.get(key)
+        if cached is None:
+            out = llm.create_completion(
+                seed_prompt + body, temperature=0.0, max_tokens=THINK_TOKENS, seed=0
+            )
+            cached = out["choices"][0]["text"]
+            with _cache_lock:
+                _cache[key] = cached
+                CACHE_PATH.write_text(json.dumps(_cache), encoding="utf-8")
+        _last_toks.pop(id(llm), None)
+
+    _, answer = parse_trace(body + cached)
+    return {
+        "step": step["index"],
+        "entropy": step["entropy"],
+        "flagged": insp.get("fork") == step["index"],
+        "readings": readings,
+        "chosen": chosen,
+        "chosen_index": pick,
+        "was_original": pick == 0,
+        "answer_before": insp["answer"],
+        "answer_after": answer or cached.strip()[:600],
     }
 
 
