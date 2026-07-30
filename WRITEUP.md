@@ -75,37 +75,33 @@ right one.
 
 Aligning steps by position made *"Who painted the Mona Lisa?"* a false positive:
 trace A's step 2 was "Identify the Subject" where trace B's was "Recall
-knowledge…", so index matching pits unlike steps together and manufactures
-disagreement.
+knowledge…", so index matching pits unlike steps together and invents disagreement.
 
 Fixing that exposed a subtler bug — we had reused the *agreement* prompt for the
-*alignment* search. But "is element 111" vs "is element 118" correctly scores NO
-as a claim-match, so the **right** counterpart looked no better than an unrelated
-step and the search returned noise. Alignment needs its own prompt asking about
-*role*, explicitly ignoring whether the steps agree.
+*alignment* search. But "is element 111" vs "is element 118" correctly scores NO as
+a claim-match, so the **right** counterpart looked no better than an unrelated step
+and the search returned noise. Alignment needs its own prompt asking about *role*,
+ignoring whether the steps agree.
 
 ## Finding 1: it is the model, not the thinking mode
 
 Gemma 3 confabulated freely on false premises. Gemma 4 **refuses or corrects nearly
-all of them** — that Tesla never received a 1917 Nobel Prize in Chemistry, that
-**no Apollo mission ever landed on the far side of the Moon** (Gemma 3 answered
-"Apollo 17"), that there is no "Hartley-Vasquez theorem".
+all of them** — that Tesla never received a 1917 Nobel Prize, that **no Apollo
+mission ever landed on the far side of the Moon** (Gemma 3 answered "Apollo 17"),
+that there is no "Hartley-Vasquez theorem".
 
-We assumed thinking mode was responsible and ran the ablation to quantify it. It
-is not. With thinking **off**, Gemma 4 declines all 12 of the same questions;
-with thinking **on**, it declines all 12. **0% confabulation in both conditions,
-so there is no reduction to measure** — a floor effect, not an effect.
+We assumed thinking mode was responsible and ran the ablation to quantify it. It is
+not. Thinking **off**: Gemma 4 declines all 12. Thinking **on**: declines all 12.
+**0% confabulation in both conditions** — a floor effect, not an effect. The
+obvious comparison misleads: Gemma 3-without-thinking against
+Gemma 4-with-thinking moves two variables and credits the feature for the model's
+improvement.
 
-That is worth stating precisely because the obvious comparison is misleading:
-Gemma 3-without-thinking vs Gemma 4-with-thinking changes two variables at once
-and credits the feature for the model's improvement. Isolating the variable
-removed the effect.
-
-It also reshaped the project. The easy confabulation bait is gone. What survives is
+This reshaped the project. The easy confabulation bait is gone. What survives is
 subtler: **partial knowledge about real entities**, where the model half-remembers
 and fills the gap — ununoctium's element number, or denying that *Attention Is All
-You Need* specifies a warmup count when it specifies 4,000. Those are exactly the
-cases a refusal-based guardrail misses, and they are what GlassBox targets.
+You Need* specifies a warmup count when it specifies 4,000. Exactly the cases a
+refusal-based guardrail misses.
 
 ## Results
 
@@ -130,43 +126,52 @@ code, not a judgement call.
 
 ## Finding 2: recognition rejects, but does not correct
 
-We said we would report the repair result either way. Here it is, including a
-measurement we had to throw away.
+We said we would report the repair result either way, so: **we could not measure
+it, and the design is why.**
 
-The first run looked clean — 4 declines, 1 kept, 0 corrections — but review caught
-that most "competing readings" were *procedure* steps ("Final Answer
-Construction"). Asking which of those is correct is a malformed question, so those
-declines measured nothing. We now filter readings to real claims first.
+Repair shows the model its own competing readings of the forked step and asks which
+is right, with "none of these" allowed. Across 8 questions only 2 produced a
+divergent step whose readings were factual claims at all, and only one — ununoctium,
+"element 111" vs "element 112" — was a clean test. It declined, correctly, because
+both are wrong. **n=1 is not a result.**
 
-On a clean candidate set the decline survives: offered "ununoctium is element 111"
-versus "element 112" — two genuine, mutually exclusive claims, both wrong — the
-model rejects both:
+The flaw is structural: adjudication can only choose among readings the sampling
+happened to produce, and the true answer is usually absent. Ununoctium is 118; the
+traces offered 111 and 112. Repair cannot recover an answer the model never
+generated. Doing it properly needs candidate generation targeted at the forked step.
+
+The safety property did hold. Our first version *forced* a choice: it picked 112 and
+confidently re-derived a whole answer around it — swapping one wrong claim for
+another and making the output *look* corrected, worse than leaving it alone. Adding
+"none of these" made it fail closed. **Zero false repairs.** That is consistent with
+[Huang et al. (ICLR 2024)](https://arxiv.org/abs/2310.01798) on self-correction; we
+avoided their failure mode and hit a different wall.
+
+## Finding 3: one forward pass instead of seven traces
+
+The obvious objection to all of this is cost: seven reasoning traces per question.
+So we implemented Semantic Entropy Probes
+([Kossen et al., arXiv:2406.15927](https://arxiv.org/pdf/2406.15927)) — train a
+linear probe on the model's hidden state to predict semantic entropy with **no
+sampling at all**.
+
+On 93 labelled examples, leave-one-out cross-validated:
 
 | | |
 |---|---|
-| Rejected every reading ("none of these") | the common outcome |
-| Corrected an answer | **0** |
-| **Made an answer worse** | **0** |
+| **AUROC** | **0.885** |
+| Accuracy | 83% (majority baseline 76%) |
 
-**Recognition was enough to reject, not enough to correct.** Shown its own
-competing versions of a step, Gemma 4 E2B reliably identifies that none is right —
-but cannot produce the right one, because the right one was never in the candidate
-set. It knows that it does not know. A negative result for repair-as-correction; a
-positive one for repair-as-guardrail: **zero false repairs in five opportunities.**
+Quote the AUROC, not the accuracy: the set is 76% negative, so accuracy flatters
+the baseline, while AUROC is threshold-independent. **0.885 means the hidden state
+ranks a confabulating answer above a grounded one nearly nine times in ten, from a
+single forward pass.**
 
-Getting there required a fix. Our first version *forced* a choice. On ununoctium —
-truly element 118 — it was offered "element 111" and "element 112", picked 112, and
-confidently re-derived a whole answer around it. It swapped one wrong claim for
-another and made the output *look* corrected, which is strictly worse than leaving
-it alone. Adding an explicit "none of these" option is what turned a
-plausible-looking failure into a guardrail that fails closed.
-
-[Huang et al. (ICLR 2024)](https://arxiv.org/abs/2310.01798) showed **intrinsic**
-self-correction fails — ask a model to reflect and performance often degrades. We
-never ask it to reflect; we hand it a shortlist it generated itself and ask a
-recognition question. Our result agrees with theirs on correction, and adds
-something on detection: the recognition signal is real and usable, it just does
-not reach far enough to fix the answer at 2B.
+That turns GlassBox into a cascade — screen every request in one pass, spend the
+seven traces only on what the probe flags. Our version reads the final-layer
+embedding through llama.cpp rather than the intermediate layers the paper probes,
+and 93 examples is small, so treat it as a feasibility result rather than a
+trained artefact.
 
 ## What we do not claim
 
