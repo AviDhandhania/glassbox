@@ -247,6 +247,93 @@
           "variants": []
         }
       ]
+    },
+    {
+      "question": "Why did Nikola Tesla decline his 1917 Nobel Prize in Chemistry?",
+      "label": 0,
+      "fork": null,
+      "answer": "This premise is factually incorrect. **Nikola Tesla did not receive a Nobel Prize in Chemistry in 1917.** The Nobel Prize in Chemistry in 1917 was awarded to **Felix Gorter and Willem Einthoven** for their work on the study of the effects of radiation on living organisms. Nikola Tesla was primarily a physicist and electrical engineer, and his major contributions were in the fields of alternating c",
+      "mean_entropy": 0.311,
+      "n_claims": 1,
+      "depth": 5,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking why Nikola Tesla declined his 1917 Nobel Prize in Chemistry.",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": false,
+          "entropy": null,
+          "text": "**Identify Key Entities:** Nikola Tesla, 1917 Nobel Prize, Chemistry.",
+          "variants": []
+        },
+        {
+          "index": 3,
+          "claim": false,
+          "entropy": null,
+          "text": "**Recall/Verify Information (Internal Knowledge Check):** * Did Tesla win a Nobel Prize in 1917? (Check historical records). * What was the subject of the prize? (The Nobel Prize in Chemistry in 1917 was awarded to Felix Gorter and Willem Einthoven for their work on the study of the effects of radiation on living organisms.) * Was Tesla involved? (No, Tesla was primarily known for electrical engineering and physics, not chemistry.) * Did Tesla decline a prize? (Need to search for this specific event.)",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": true,
+          "entropy": 0.311,
+          "text": "**Synthesize Findings & Formulate Answer Strategy:** * The premise of the question is flawed: Tesla did not win the 1917 Nobel Prize in Chemistry. * The answer must correct this factual error while addressing the spirit of the question (Tesla's relationship with awards/recognition).",
+          "variants": [
+            "**Formulate the Answer Strategy:** Since the premise of the question (declining a prize he didn't win) is flawed, the answer must correct the premise while providing accurate context about his recognition."
+          ]
+        },
+        {
+          "index": 5,
+          "claim": false,
+          "entropy": null,
+          "text": "**Draft the Response (Focusing on Accuracy):** State clearly that Tesla did not receive that specific prize and explain his actual focus. (Self-Correction: Ensure the tone is informative and respectful.)",
+          "variants": []
+        }
+      ]
+    },
+    {
+      "question": "Which Apollo mission first landed on the far side of the Moon?",
+      "label": 0,
+      "fork": null,
+      "answer": "No Apollo mission ever landed on the far side of the Moon. The Apollo missions were designed to explore the near side of the Moon. While later missions (such as the Soviet Luna program and later robotic missions) have explored the far side, none of the Apollo missions achieved a landing on that side.",
+      "mean_entropy": 0.0,
+      "n_claims": 0,
+      "depth": 4,
+      "steps": [
+        {
+          "index": 1,
+          "claim": false,
+          "entropy": null,
+          "text": "**Analyze the Request:** The user is asking which Apollo mission first landed on the far side of the Moon.",
+          "variants": []
+        },
+        {
+          "index": 2,
+          "claim": false,
+          "entropy": null,
+          "text": "**Recall/Verify Knowledge about Apollo Missions and Lunar Landing Sites:** * Apollo missions primarily focused on the near side (the side visible from Earth) and specific regions on the far side. * The goal of landing on the far side is to gather data about the lunar environment and potentially set up future missions.",
+          "variants": []
+        },
+        {
+          "index": 3,
+          "claim": false,
+          "entropy": null,
+          "text": "**Identify Key Missions/Landings:** * Apollo 11: First landing (near side). * Apollo 12: Second landing (near side). * Apollo 14: Landing in the Sea of Tranquility (near side). * Apollo 15: Landing in the Hadley Rille/Apennine Mountains (near side). * Apollo 16: Landing in the Descartes Highlands (near side). * Apollo 17: Landing in the Taurus-Littrow valley (near side).",
+          "variants": []
+        },
+        {
+          "index": 4,
+          "claim": false,
+          "entropy": null,
+          "text": "**Focus on \"Far Side\" Landings:** * The Apollo program did not land on the far side of the Moon. The missions were designed to explore the near side and specific regions of the near side. * *Self-Correction/Refinement:* While the Apollo missions did not land on the far side, later missions (like the Soviet Luna program or later robotic missions) explored the far side. However, the question specifically asks about an *Apollo* mission.",
+          "variants": []
+        }
+      ]
     }
   ]
 }

@@ -391,13 +391,33 @@ def serve(port=8000):
 
 TRACE_SPLIT = re.compile(r"<channel\|>")
 STEP_SPLIT = re.compile(r"^\s*\d+\.\s+", re.M)
-# A step counts as a fork when the samples stop agreeing about it. Same scale as
-# the answer-level entropy.
+# PROVISIONAL. Inherited from the answer-level cut-off and not yet swept against
+# labelled step data - `python traces.py --report` derives it properly and prints
+# the value to paste here. Treat any fork/no-fork call as untuned until then.
 FORK = 0.45
-TRACE_SAMPLES = 4  # 5 traces total with the greedy one; each costs ~40s on CPU
+# Entropy over a handful of aligned traces is a coarse estimate - with 4 traces
+# it can only take a few values, so one sample landing differently swings it
+# past a threshold. More traces is the honest fix; the Arc box has the headroom.
+TRACE_SAMPLES = 6
+ALIGN_MIN = 0.35  # below this, a trace simply never made this move
 MAX_STEPS = 6  # forks land early; later steps are answer-formatting boilerplate
 
 STEP_TMPL = """Two reasoning steps come from two attempts at the same question. Do they make the same move - the same claim, the same decision, the same next action?
+
+Question: {q}
+Step A: {a}
+Step B: {b}
+
+Reply with exactly one word, YES or NO."""
+
+# Alignment and scoring are different questions, and using one prompt for both
+# breaks alignment: "is element 111" vs "is element 118" scores NO as a
+# claim-match - correctly - which makes the RIGHT counterpart look no better
+# than an unrelated step, so the search returns noise. Alignment must ask about
+# role, deliberately ignoring whether the two steps agree.
+ALIGN_TMPL = """Two reasoning steps come from two attempts at the same question. Do they play the same role - addressing the same sub-question or performing the same part of the reasoning?
+
+Answer YES even if they reach DIFFERENT conclusions. Only the role matters here, not whether they agree.
 
 Question: {q}
 Step A: {a}
@@ -410,13 +430,31 @@ Reply with exactly one word, YES or NO."""
 # actual factual error scored 0.69. Ranking on raw entropy therefore points at
 # the wrong step. Only steps that assert something can be wrong, so we score
 # those and mark the rest as procedure.
-CLAIM_TMPL = """Does this reasoning step assert a specific fact - a name, number, date, identity, or definite statement about the world?
+CLAIM_TMPL = """Could this reasoning step be factually WRONG? Answer YES only if it commits to a substantive fact about the world - a name, a number, a date, an identity, a value.
 
-Answer NO if it only describes a plan or a procedure, such as deciding what to look up, how to structure a response, or checking whether information is available.
+Answer NO for anything that merely:
+- restates or rephrases the question
+- names the topic without asserting anything about it
+- describes a plan, a procedure, or how to format the response
+- says the model will look something up, or checks whether it knows
 
-Step: {s}
+Step: "Ununoctium is element 118."
+Could this be wrong? YES
 
-Reply with exactly one word, YES or NO."""
+Step: "Identify the Subject: The Mona Lisa."
+Could this be wrong? NO
+
+Step: "The telephone was patented in 1876."
+Could this be wrong? YES
+
+Step: "Final Answer Construction."
+Could this be wrong? NO
+
+Step: "{s}"
+Could this be wrong?"""
+# 0.5 let through steps that merely mention an entity. A claim step should be
+# unambiguous, so require the judge to be confident rather than merely leaning.
+CLAIM_THRESHOLD = 0.90
 
 
 def think(question, seed, temperature, max_tokens=THINK_TOKENS):
@@ -453,57 +491,75 @@ def parse_trace(text):
 
 
 def is_claim(step):
-    return p_yes(CLAIM_TMPL.format(s=step)) >= 0.5
+    return p_yes(CLAIM_TMPL.format(s=step)) >= CLAIM_THRESHOLD
 
 
-def step_entropy(question, traces, max_steps=MAX_STEPS):
-    """Per-step semantic entropy across N reasoning traces, aligned by position.
+def counterpart(question, step, trace):
+    """The step in `trace` that makes the same move as `step`, or the closest one.
 
-    ponytail: positional alignment - step 3 of one trace is compared with step 3
-    of the others. Gemma 4 plans in a consistent order for a given question, so
-    this holds in practice; if a sample inserts an extra step everything after it
-    shifts by one and that step reads as a fork. Content-based alignment is the
-    upgrade if that shows up.
+    Alignment is by content, not position. Traces do not share a step ordering -
+    one plans "Identify the Subject" where another writes "Recall knowledge
+    about ...", so comparing index 2 against index 2 pits different kinds of step
+    against each other and manufactures a disagreement out of nothing.
     """
-    depth = min(min(len(t) for t in traces), max_steps)
+    return max(((p_yes(ALIGN_TMPL.format(q=question, a=step, b=c)), c) for c in trace), default=(0.0, ""))
+
+
+def step_entropy(question, primary, others, max_steps=MAX_STEPS):
+    """For each assertion in the primary trace, find its counterpart in every
+    other trace, then take semantic entropy over that aligned group.
+    """
     out = []
-    for i in range(depth):
-        variants = [t[i] for t in traces]
-        claim = is_claim(variants[0])
+    for i, step in enumerate(primary[:max_steps]):
+        claim = is_claim(step)
+        if not claim:  # procedure steps are reworded freely; scoring them is noise
+            out.append({"index": i + 1, "text": step, "claim": False, "entropy": None,
+                        "n_clusters": None, "n_aligned": 0, "absent": 0, "variants": []})
+            continue
+
+        # A trace that never addressed this point has no counterpart to compare.
+        # Forcing max() to return its closest step anyway drags an unrelated
+        # procedure step into the group and reports it as a competing reading.
+        matches = [counterpart(question, step, t) for t in others if t]
+        aligned = [step] + [c for p, c in matches if p >= ALIGN_MIN]
+        absent = sum(1 for p, _ in matches if p < ALIGN_MIN)
         clusters = []
-        if claim:  # procedure steps are reworded freely; scoring them is noise
-            for j, v in enumerate(variants):
-                for c in clusters:
-                    if p_yes(STEP_TMPL.format(q=question, a=variants[c[0]], b=v)) >= JUDGE_THRESHOLD:
-                        c.append(j)
-                        break
-                else:
-                    clusters.append([j])
+        for j, v in enumerate(aligned):
+            for c in clusters:
+                if p_yes(STEP_TMPL.format(q=question, a=aligned[c[0]], b=v)) >= JUDGE_THRESHOLD:
+                    c.append(j)
+                    break
+            else:
+                clusters.append([j])
         out.append(
             {
                 "index": i + 1,
-                "text": variants[0],
-                "claim": claim,
-                "entropy": round(entropy(clusters, len(variants)), 3) if claim else None,
-                "n_clusters": len(clusters) if claim else None,
-                "variants": [variants[c[0]] for c in clusters[1:]],  # the divergent readings
+                "text": step,
+                "claim": True,
+                "entropy": round(entropy(clusters, len(aligned)), 3),
+                "n_clusters": len(clusters),
+                "n_aligned": len(aligned),
+                "absent": absent,  # traces that never made this move at all
+                "variants": [aligned[c[0]] for c in clusters[1:]],  # the divergent readings
             }
         )
     return out
 
 
 def inspect(question, n=TRACE_SAMPLES):
-    """Sample N reasoning traces, score every step, and locate the fork."""
+    """Sample N reasoning traces, score every assertion, and locate the fork."""
     primary_steps, primary_answer = parse_trace(think(question, seed=0, temperature=0.0))
-
-    samples = [parse_trace(think(question, i + 1, TEMP))[0] for i in range(n)]
-    traces = [t for t in ([primary_steps] + samples) if t]
-    if not traces:
+    others = [parse_trace(think(question, i + 1, TEMP))[0] for i in range(n)]
+    others = [t for t in others if t]
+    if not primary_steps:
+        primary_steps = others.pop(0) if others else []
+    if not primary_steps:
         return {"question": question, "error": "no parseable reasoning trace"}
 
-    steps = step_entropy(question, traces)
+    steps = step_entropy(question, primary_steps, others)
     claims = [s for s in steps if s["claim"]]
     fork = next((s["index"] for s in claims if s["entropy"] >= FORK), None)
+    traces = [primary_steps] + others
     return {
         "question": question,
         "answer": primary_answer,
