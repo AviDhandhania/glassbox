@@ -127,6 +127,12 @@
   .step.fork::before { background: var(--crit); box-shadow: 0 0 0 4px color-mix(in srgb, var(--crit) 22%, transparent); }
   .step.answer::before { background: var(--accent); }
   .step p { margin: 0; font-size: 15px; }
+  .step .num {
+    display: inline-block; min-width: 20px; margin-right: 8px; color: var(--ink-3);
+    font-size: 12.5px; font-variant-numeric: tabular-nums; font-weight: 600;
+  }
+  .step.fork .num { color: var(--crit); }
+  .step strong { font-weight: 620; }
   .step.proc p { color: var(--ink-3); font-size: 14px; }
   .step .meta { font-size: 12px; color: var(--ink-3); margin-top: 6px; letter-spacing: .01em; }
   .step .meta b { color: var(--crit); letter-spacing: .05em; }
@@ -217,6 +223,21 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const clip = (s, n) => (s.length > n ? s.slice(0, n).trimEnd() + "…" : s);
 
+  // Gemma writes markdown and LaTeX into its reasoning. Rendering it raw leaves
+  // "**Identify the element:**" and "$\text{Uun}$" on screen, which reads as broken
+  // rather than as the model's own formatting. Escape first, then unwrap.
+  function fmt(s) {
+    return esc(String(s))
+      .replace(/\$\\text\{([^}]*)\}\$?/g, "$1")   // $\text{Uun}$ -> Uun
+      .replace(/\\text\{([^}]*)\}/g, "$1")
+      .replace(/\$([^$]{1,40})\$/g, "$1")          // $6.8$ -> 6.8
+      .replace(/\s*\*\*\*\s*/g, " — ")             // before **, or it eats the pair
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*\n]{1,80})\*/g, "<em>$1</em>")
+      .replace(/(^|\s)\*\s+/g, "$1• ")             // leftover bullet markers
+      .replace(/\*+/g, "");                        // any unmatched strays
+  }
+
   const chips = document.getElementById("chips");
   PRESETS.forEach((p) => {
     const b = document.createElement("button");
@@ -246,17 +267,18 @@
 
   function stepRow(s, r) {
     const isFork = s.index === r.fork;
+    const n = s.is_answer ? "→" : s.index;
     if (!s.claim)
-      return `<div class="step proc"><p>${esc(s.text)}</p>
+      return `<div class="step proc"><p><span class="num">${n}</span>${fmt(s.text)}</p>
         <div class="meta">procedure — not scored</div></div>`;
 
     // The answer already appears in full above; repeating it here just doubles a
     // wall of text. Show that it was scored, not the text again.
     const body = s.is_answer
-      ? `<p style="color:var(--ink-2)">${esc(clip(s.text, 150))}</p>`
-      : `<p>${esc(s.text)}</p>`;
+      ? `<p style="color:var(--ink-2)"><span class="num">${n}</span>${fmt(clip(s.text, 150))}</p>`
+      : `<p><span class="num">${n}</span>${fmt(s.text)}</p>`;
     const alts = s.variants
-      .map((v) => `<p class="alt">${s.is_answer ? "another trace answered" : "also read as"}: ${esc(clip(v, 240))}</p>`)
+      .map((v) => `<p class="alt">${s.is_answer ? "another trace answered" : "also read as"}: ${fmt(clip(v, 240))}</p>`)
       .join("");
     const tag = s.is_answer ? "final answer · " : isFork ? "<b>FORK</b> · " : "";
     const cls = "step claim" + (isFork ? " fork" : "") + (s.is_answer ? " answer" : "");
@@ -280,7 +302,7 @@
         <div class="stat"><div class="v">${r.n_traces}</div><div class="k">traces compared</div></div>
         <div class="stat"><div class="v">${r.depth}</div><div class="k">reasoning steps</div></div>
       </div>
-      <p class="answer">${esc(r.answer)}</p>
+      <p class="answer">${fmt(r.answer)}</p>
       <h2>Inside the reasoning</h2>
       <div class="spine">${r.steps.map((s) => stepRow(s, r)).join("")}</div>
       ${repairPanel(r.repair)}
