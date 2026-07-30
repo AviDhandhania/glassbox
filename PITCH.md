@@ -47,24 +47,41 @@ Click **"What is the atomic radius of ununoctium?"**
 
 Pause on that. It's the moment the room gets it.
 
-## 1:20 — Demo part 3: repair (30s)
+## 1:20 — Demo part 3: it fails closed (25s)
 
-> "So we hand it back its own three readings and ask which is right.
+**Measured position — say exactly this, no more:**
+
+> "So we hand it back its own two readings — 111 and 112 — and ask which is right,
+> with 'none of these' allowed.
 >
-> Not 'are you sure?' — that's been tried, and it doesn't work. We give it a
-> multiple choice built from evidence it produced itself. Recognition instead of
-> recall.
+> **It rejects both.** Correctly: the answer is 118, and 118 was never in its own
+> candidate set. So we flag it and stop.
 >
-> It re-reasons from that step, and the answer changes."
+> An earlier version *forced* a choice. It picked 112 and confidently rebuilt the
+> whole answer around it — one wrong claim swapped for another, and now it *looks*
+> corrected. That's worse than doing nothing. A guardrail has to fail closed."
 
-Show before/after.
+**Do not claim repair fixes answers.** It never did, in 8 questions. Only one
+produced a clean factual adjudication, so there is no measurement — and the
+writeup says so. If asked "does it repair?":
 
-> **⚠ Only say this if `repair_check.py` confirmed it.** If Arc showed the model
-> mostly re-picking its original reading, cut this section and say instead:
-> *"We built the repair loop and measured it. At 2B, recognition did not beat
-> recall — the model usually stands by its first reading. That's a real negative
-> result and it's in the writeup."* Judges respect that far more than a claim they
-> can break with one question.
+> "No. We built it, measured it, and it doesn't — the true answer usually isn't in
+> the model's own candidate set, so there's nothing to pick. What it does reliably
+> is refuse to invent a fix. Zero false repairs."
+
+## 1:45 — The cost answer (20s)
+
+> "Seven traces sounds expensive. So we implemented Semantic Entropy Probes —
+> Kossen et al. — and trained a linear probe on the hidden state to predict
+> confabulation from **one forward pass**, no sampling.
+>
+> **AUROC 0.885 across 93 examples.** It ranks a confabulating answer above a
+> grounded one nearly nine times in ten. So you screen everything in one pass and
+> spend the seven traces only on what gets flagged."
+
+Quote **AUROC, not accuracy** — the set is 76% negative, so accuracy (83%) only
+beats the majority baseline by 7 points and is easy to wave away. AUROC is
+threshold-independent.
 
 ## 1:50 — The numbers (30s)
 
@@ -179,6 +196,10 @@ setting has neither.
 |---|---|
 | Judge accuracy | 12/12 labelled pairs |
 | Answer-level detection | 92% recall, 100% precision, n=24 |
+| **Step-level localization** | **86% accuracy**, 83% precision/recall, n=14 |
+| **Single-pass probe** | **AUROC 0.885**, n=93 |
+| Self-repair | 0 corrections, **0 false repairs** — not measurable, see writeup |
+| Thinking mode ablation | 0% confabulation on *and* off — floor effect, no result |
 | Mean entropy, known vs obscure | 0.026 vs 0.674 |
 | Judge speedup from KV reuse | 55s → 18.5s (3×) |
 | Model footprint | one 2.9 GB GGUF, reasoner + judge |
