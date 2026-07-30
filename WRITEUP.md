@@ -2,22 +2,21 @@
 
 **Track: AI Shield**
 
-*Step-level hallucination localization and self-repair, running entirely on one
-2.9 GB Gemma 4 E2B on a laptop CPU.*
+*Step-level hallucination localization and self-repair, on one 2.9 GB Gemma 4 E2B,
+on a laptop CPU.*
 
 ---
 
 ## The problem with thinking mode
 
-Gemma 4's headline feature is that it reasons before it answers — thousands of
-tokens of visible chain-of-thought. That is a real safety advance (see *Finding
-1*). But **nobody reads 4,000 tokens of reasoning.** The trace is right there and
-still a black box. Everyone will *use* thinking mode; we decided to **instrument**
-it.
+Gemma 4 reasons before it answers — thousands of tokens of visible
+chain-of-thought. But **nobody reads 4,000 tokens of reasoning.** The trace is
+right there and still a black box. Everyone will *use* thinking mode; we decided
+to **instrument** it.
 
 We do not answer "is this true?" — that needs a source. We answer **"is the model
 making this up right now, and exactly where?"** That is answerable from the model
-alone, and it is what a guardrail actually needs.
+alone, and it is what a guardrail needs.
 
 ## How it works
 
